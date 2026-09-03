@@ -17,7 +17,7 @@
     <meta name="description" content="Core system ICT "/>
 
     <!-- Favicon -->
-    <link rel="icon" type="image/jpeg" href="{{asset(config('app.logo'))}}"/>
+    <link rel="icon" type="{{ config('app.logo_mime') }}" href="{{asset(config('app.logo'))}}"/>
 
     <!-- Icons -->
 

@@ -18,7 +18,7 @@
     <meta name="description" content=""/>
 
     <!-- Favicon -->
-    <link rel="icon" type="image/jpeg" href="{{asset(config('app.logo'))}}"/>
+    <link rel="icon" type="{{ config('app.logo_mime') }}" href="{{asset(config('app.logo'))}}"/>
     <!-- Vendors CSS -->
     <link rel="stylesheet" href="{{asset('main/libs/perfect-scrollbar/perfect-scrollbar.css')}}"/>
     <link rel="stylesheet" href="{{asset('main/libs/sweetalert2/sweetalert2.css')}}"/>

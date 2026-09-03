@@ -445,7 +445,7 @@
             };
 
             function generatePdfRekapTagihanPdfMake(data) {
-                const logo = headerLogo ? {image: 'data:image/jpeg;base64,' + headerLogo, width: 60} : '';
+                const logo = headerLogo ? {image: 'data:{{ config('app.logo_mime') }};base64,' + headerLogo, width: 60} : '';
                 const tanggalSekarang = new Date().toLocaleDateString('id-ID', {
                     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
                 });

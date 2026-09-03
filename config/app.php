@@ -16,10 +16,18 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Bintang Juara'),
-    'nama_instansi' => env('APP_NAMA_INSTANSI', 'Sekolah Islam Bintang Juara'),
+    'name' => env('APP_NAME', 'Al Syukro Universal'),
+    'nama_instansi' => env('APP_NAMA_INSTANSI', 'Al Syukro Universal'),
     'alamat' => env('APP_ALAMAT', 'Kota Semarang, Prov. Jawa Tengah'),
-    'logo' => env('APP_LOGO', 'logo-bijur.jpeg'),
+    'logo' => env('APP_LOGO', 'icon.png'),
+    'logo_mime' => match (strtolower(pathinfo((string) env('APP_LOGO', 'icon.png'), PATHINFO_EXTENSION))) {
+        'png' => 'image/png',
+        'svg' => 'image/svg+xml',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'ico' => 'image/x-icon',
+        default => 'image/jpeg',
+    },
     'email' => env('APP_EMAIL', 'ypisabkho@gmail.com'),
     'telepon' => env('APP_TELEPON', 'SIKEU'),
     'domisili' => env('APP_DOMISILI', 'Semarang'),

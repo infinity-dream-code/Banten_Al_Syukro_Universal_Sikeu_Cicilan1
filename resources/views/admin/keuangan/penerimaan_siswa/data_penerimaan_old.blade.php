@@ -687,7 +687,7 @@
 
 // Add logo (aligned to the left)
             if (headerLogo) {
-                doc.addImage('data:image/jpeg;base64,' + headerLogo, 'JPEG', 15, y, 30, 30);
+                doc.addImage('data:{{ config('app.logo_mime') }};base64,' + headerLogo, '{{ str_contains(config('app.logo_mime'), 'png') ? 'PNG' : 'JPEG' }}', 15, y, 30, 30);
             }
 
 // Calculate center position (adjust based on page width)

@@ -418,7 +418,7 @@
 
             async function generatePdf(title, bodyContent) {
                 try {
-                    let logo = 'data:image/jpeg;base64,' + headerLogo;
+                    let logo = 'data:{{ config('app.logo_mime') }};base64,' + headerLogo;
 
                     const orientation = 'portrait';
                     const pageMargins = [20, 20, 20, 20];
