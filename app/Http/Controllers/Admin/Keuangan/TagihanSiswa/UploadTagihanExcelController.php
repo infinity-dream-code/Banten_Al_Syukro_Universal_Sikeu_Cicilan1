@@ -72,12 +72,26 @@ class UploadTagihanExcelController extends Controller
 
     public function getData(Request $request)
     {
+        try {
+            return $this->buildImportedTagihanData($request);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'draw' => (int) $request->get('draw'),
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+            ]);
+        }
+    }
+
+    private function buildImportedTagihanData(Request $request)
+    {
         $draw = $request->get('draw');
         $start = $request->get('start');
         $rowperpage = $request->get('length');
 
-        $columnName_arr = $request->get('columns');
-        $search_arr = $request->get('search');
+        $columnName_arr = $request->get('columns') ?? [];
+        $search_arr = $request->get('search') ?? [];
 
         $defaultColumn = 'scctcust.nocust';
         $defaultOrder = 'asc';
@@ -89,7 +103,9 @@ class UploadTagihanExcelController extends Controller
             $order = $request->get('order');
             $columnIndex = (int) ($order[0]['column'] ?? 0);
             $columnSortOrder = $order[0]['dir'] ?? $defaultOrder;
-            $requestedColumn = $columnName_arr[$columnIndex]['data'] ?? null;
+            $requestedColumn = is_array($columnName_arr)
+                ? ($columnName_arr[$columnIndex]['data'] ?? null)
+                : null;
 
             if ($requestedColumn && $requestedColumn !== 'no') {
                 $columnName = 'scctcust.' . $requestedColumn;
@@ -102,6 +118,9 @@ class UploadTagihanExcelController extends Controller
         $filterQuery = null;
 
         $cachedData = Cache::get($this->cacheKey, []);
+        if (!is_array($cachedData)) {
+            $cachedData = [];
+        }
 
         $nisList = collect($cachedData)->pluck('nis')->toArray();
         $nisCount = count($cachedData);
@@ -121,7 +140,7 @@ class UploadTagihanExcelController extends Controller
         ]));
 
         $records = collect($cachedData)->map(function ($item) use ($select){
-            $nis = $item['nis'];
+            $nis = $item['nis'] ?? null;
             $siswa = scctcust::select($select)->where('scctcust.NOCUST', $nis);
             SchoolScope::apply($siswa, 'scctcust', $this->sekolah);
             $siswa = $siswa->first();
@@ -134,7 +153,7 @@ class UploadTagihanExcelController extends Controller
                 'kelompok' => $siswa->DESC03 ?? null,
                 'nominal' => $item['nominal'] ?? null,
                 'status' => $item['status'] ?? 0,
-                'keterangan' => $item['keterangan'],
+                'keterangan' => $item['keterangan'] ?? null,
             ];
         });
 
@@ -241,13 +260,15 @@ class UploadTagihanExcelController extends Controller
         $request->validate([
             'tagihan' => ['required'],
             'periode_tahun' => ['required', 'integer', 'digits:4', 'min:2000', 'max:2099'],
-            'periode_bulan' => ['required', 'integer', 'min:1', 'max:12'],
+            'periode_bulan' => ['nullable', 'integer', 'min:1', 'max:12'],
         ], ValidationMessage::messages(), ValidationMessage::attributes());
 
         $data = Cache::get($this->cacheKey);
         if (empty($data))return response()->json(['message' => 'Silahkan import data tagihan terlebih dahulu'], 422);
 
-        $bta = sprintf('%04d%02d', (int) $request->periode_tahun, (int) $request->periode_bulan);
+        $bta = $request->filled('periode_bulan')
+            ? sprintf('%04d%02d', (int) $request->periode_tahun, (int) $request->periode_bulan)
+            : sprintf('%04d', (int) $request->periode_tahun);
 
         $tagihan = mst_tagihan::where('urut', $request->tagihan)->first();
         if (!$tagihan) return response()->json(['message' => 'Tagihan tidak ditemukan, silahkan muat ulang halaman!'], 422);

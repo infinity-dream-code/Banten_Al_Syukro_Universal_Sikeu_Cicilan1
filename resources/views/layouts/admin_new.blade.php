@@ -14,6 +14,7 @@
 
     <title>@yield('title', config('app.name')) - {{ config('app.name') }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}"/>
+    <meta name="keep-alive-url" content="{{ route('admin.keep-alive') }}"/>
     <meta name="description" content="Core system ICT "/>
 
     <!-- Favicon -->
@@ -376,6 +377,7 @@
         });
     })
 </script>
+<script src="{{ asset('js/session-keepalive.js') }}?v=20260916-auth3"></script>
 
 @hasSection('errorInputHelper')
     <script src="{{asset('js/helper/errorInputHelper.min.js')}}"></script>

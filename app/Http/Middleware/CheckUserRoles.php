@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\PersistentLogin;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,8 +17,10 @@ class CheckUserRoles
      */
     public function handle(Request $request, Closure $next, ...$params)
     {
+        PersistentLogin::restoreFromRequest($request);
+
         if (!Auth::check()) {
-            return redirect('login');
+            return PersistentLogin::unauthenticatedResponse($request);
         }
         $user = Auth::user();
 

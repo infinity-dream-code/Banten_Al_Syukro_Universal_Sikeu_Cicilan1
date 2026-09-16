@@ -57,27 +57,29 @@ class UploadTagihanPMBExcelController extends Controller
 
     public function getData(Request $request)
     {
-        $draw = $request->get('draw');
+        try {
+            $draw = $request->get('draw');
         $start = $request->get('start');
         $rowperpage = $request->get('length');
 
-        $columnName_arr = $request->get('columns');
-        $search_arr = $request->get('search');
+        $columnName_arr = $request->get('columns') ?? [];
+        $search_arr = $request->get('search') ?? [];
 
         $defaultColumn = 'scctcust.NUM2ND';
         $defaultOrder = 'asc';
+        $columnSortOrder = $defaultOrder;
+        $columnName = $defaultColumn;
 
         if ($request->has('order')) {
-            $columnIndex_arr = $request->get('order');
-            $columnIndex = $columnIndex_arr[0]['column'];
-            $columnSortOrder = $columnIndex_arr[0]['dir'];
-        } else {
-            $columnIndex = $defaultColumn;
-            $columnSortOrder = $defaultOrder;
+            $columnIndex_arr = $request->get('order') ?? [];
+            $columnIndex = (int) ($columnIndex_arr[0]['column'] ?? 0);
+            $columnSortOrder = $columnIndex_arr[0]['dir'] ?? $defaultOrder;
+            $columnName = is_array($columnName_arr)
+                ? ($columnName_arr[$columnIndex]['data'] ?? $defaultColumn)
+                : $defaultColumn;
         }
 
-        $columnName = $columnName_arr[$columnIndex]['data'];
-        $searchValue = $search_arr['value'];
+        $searchValue = $search_arr['value'] ?? '';
 
         if (!$columnName || $columnName == 'no') {
             $columnName = $defaultColumn;
@@ -88,6 +90,9 @@ class UploadTagihanPMBExcelController extends Controller
         $filterQuery = null;
 
         $cachedData = Cache::get($this->cacheKey, []);
+        if (!is_array($cachedData)) {
+            $cachedData = [];
+        }
 
 //        dd($cachedData);
         $nisList = collect($cachedData)->pluck('nodaftar')->toArray();
@@ -109,7 +114,7 @@ class UploadTagihanPMBExcelController extends Controller
         ]));
 
         $records = collect($cachedData)->map(function ($item) use ($select) {
-            $nodaftar = $item['nodaftar'];
+            $nodaftar = $item['nodaftar'] ?? null;
             $siswa = scctcust::select($select)->where('scctcust.NUM2ND', $nodaftar)->first();
             return [
                 'NUM2ND' => $nodaftar,
@@ -130,6 +135,14 @@ class UploadTagihanPMBExcelController extends Controller
             'nislist' => $nisList
         );
         return response()->json($response);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'draw' => (int) $request->get('draw'),
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+            ]);
+        }
     }
 
 
@@ -181,13 +194,15 @@ class UploadTagihanPMBExcelController extends Controller
         $request->validate([
             'tagihan' => ['required'],
             'periode_tahun' => ['required', 'integer', 'digits:4', 'min:2000', 'max:2099'],
-            'periode_bulan' => ['required', 'integer', 'min:1', 'max:12'],
+            'periode_bulan' => ['nullable', 'integer', 'min:1', 'max:12'],
         ], ValidationMessage::messages(), ValidationMessage::attributes());
 
         $data = Cache::get($this->cacheKey);
         if (empty($data))return response()->json(['message' => 'Silahkan import data tagihan terlebih dahulu'], 422);
 
-        $bta = sprintf('%04d%02d', (int) $request->periode_tahun, (int) $request->periode_bulan);
+        $bta = $request->filled('periode_bulan')
+            ? sprintf('%04d%02d', (int) $request->periode_tahun, (int) $request->periode_bulan)
+            : sprintf('%04d', (int) $request->periode_tahun);
 
         $tagihan = mst_tagihan::where('urut', $request->tagihan)->first();
         if (!$tagihan) return response()->json(['message' => 'Tagihan tidak ditemukan, silahkan muat ulang halaman!'], 422);

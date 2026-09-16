@@ -138,7 +138,8 @@
                             </div>
                             <div class="col-sm-6">
                                 <select class="form-select" id="periode_bulan" name="periode_bulan"
-                                        required data-control="select2" data-placeholder="Pilih bulan">
+                                        data-control="select2" data-placeholder="Pilih bulan" data-allow-clear="true">
+                                    <option value="">Tanpa bulan</option>
                                     @foreach($bulanList as $bulan => $label)
                                         <option value="{{ $bulan }}"
                                             @selected(($periode_bulan_default ?? date('n')) == $bulan)>
@@ -153,6 +154,7 @@
                             <span>Kode BTA</span>
                             <span class="badge bg-primary" id="periode_preview">-</span>
                         </div>
+                        <div class="form-text">Kosongkan bulan untuk tagihan tanpa periode bulanan (PSB). Kode BTA jadi tahun saja, misalnya <strong>2026</strong>.</div>
                     </div>
                 </div>
             </form>
@@ -384,9 +386,11 @@
 
         function syncPeriodePreview() {
             const tahun = $('#periode_tahun').val();
-            const bulan = String($('#periode_bulan').val() || '').padStart(2, '0');
-            if (tahun && bulan) {
-                $('#periode_preview').text(`${tahun}${bulan}`);
+            const bulanVal = $('#periode_bulan').val();
+            if (tahun && bulanVal) {
+                $('#periode_preview').text(`${tahun}${String(bulanVal).padStart(2, '0')}`);
+            } else if (tahun) {
+                $('#periode_preview').text(tahun);
             } else {
                 $('#periode_preview').text('-');
             }
@@ -433,6 +437,7 @@
                         language: 'id',
                         dropdownParent: $this.parent(),
                         width: '100%',
+                        allowClear: $this.data('allow-clear') === true,
                     });
                 });
             }

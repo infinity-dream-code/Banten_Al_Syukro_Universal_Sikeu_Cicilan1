@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\PersistentLogin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
@@ -10,6 +11,8 @@ class AuthController extends Controller
 {
     public function index()
     {
+        PersistentLogin::restoreFromRequest(request());
+
         if (Auth::check()) {
             return redirect()->route("admin.index");
         }
