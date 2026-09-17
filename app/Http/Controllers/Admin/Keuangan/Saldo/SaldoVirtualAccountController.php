@@ -400,8 +400,9 @@ class SaldoVirtualAccountController extends Controller
             ])
             ->groupBy('CUSTID');
 
+        // Hanya siswa yang punya riwayat transaksi VA (bukan manual cash).
         $query = scctcust::query()
-            ->leftJoinSub($saldoAgg, 'trx', function ($join) {
+            ->joinSub($saldoAgg, 'trx', function ($join) {
                 $join->on('trx.CUSTID', '=', 'scctcust.CUSTID');
             });
 
@@ -421,10 +422,15 @@ class SaldoVirtualAccountController extends Controller
         }
 
         $scopedCodesForCount = $this->resolveScopedSchoolCodes();
-        $totalRecords = Cache::remember('scctcust_total_count_' . md5(json_encode($scopedCodesForCount)), 600, function () use ($scopedCodesForCount) {
-            return scctcust::when(!empty($scopedCodesForCount), function ($query) use ($scopedCodesForCount) {
-                $query->whereIn('CODE01', $scopedCodesForCount);
-            })->count('CUSTID');
+        $totalRecords = Cache::remember('scctcust_va_with_trx_count_' . md5(json_encode($scopedCodesForCount)), 600, function () use ($scopedCodesForCount, $saldoAgg) {
+            return scctcust::query()
+                ->joinSub($saldoAgg, 'trx_count', function ($join) {
+                    $join->on('trx_count.CUSTID', '=', 'scctcust.CUSTID');
+                })
+                ->when(!empty($scopedCodesForCount), function ($query) use ($scopedCodesForCount) {
+                    $query->whereIn('CODE01', $scopedCodesForCount);
+                })
+                ->count('scctcust.CUSTID');
         });
 
         $totalRecordswithFilter = (clone $query)->count('scctcust.CUSTID');

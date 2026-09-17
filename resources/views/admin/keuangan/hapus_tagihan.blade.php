@@ -382,7 +382,7 @@
                 let selectedRows = DT[`${dtOptions.tableId}`].rows({selected: true}).data();
 
                 if (!selectedRows[0]) {
-                    warningAlert('silahkan pilih s2iswa!')
+                    warningAlert('silahkan pilih siswa!')
                     return;
                 }
 
