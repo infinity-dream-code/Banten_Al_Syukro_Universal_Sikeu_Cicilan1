@@ -62,12 +62,17 @@ class UploadTagihanExcelController extends Controller
         return [
             ['data' => null, 'name' => 'no', 'className' => 'text-center', 'columnType' => 'row'],
             ['data' => 'nis', 'name' => 'NIS', 'searchable' => true, 'orderable' => true],
+            ['data' => 'nodaftar', 'name' => 'No Pend', 'searchable' => true, 'orderable' => true],
             ['data' => 'name', 'name' => 'NAMA', 'searchable' => true, 'orderable' => true],
             ['data' => 'status', 'name' => 'Status', 'searchable' => true, 'orderable' => true, 'columnType' => 'importstatus'],
             ['data' => 'keterangan', 'name' => 'Keterangan', 'searchable' => true, 'orderable' => true],
             ['data' => 'unit', 'name' => 'Unit', 'searchable' => true, 'orderable' => true],
             ['data' => 'kelas', 'name' => 'Kelas', 'searchable' => true, 'orderable' => true],
             ['data' => 'kelompok', 'name' => 'Kelompok', 'searchable' => true, 'orderable' => true],
+            ['data' => 'angkatan', 'name' => 'Angkatan', 'searchable' => true, 'orderable' => true],
+            ['data' => 'gender', 'name' => 'Jenis Kelamin', 'searchable' => true, 'orderable' => true],
+            ['data' => 'ortu', 'name' => 'Ortu / Wali', 'searchable' => true, 'orderable' => true],
+            ['data' => 'alamat', 'name' => 'Alamat', 'searchable' => true, 'orderable' => true],
             ['data' => 'nominal', 'name' => 'Nominal', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency'],
         ];
     }
@@ -151,11 +156,15 @@ class UploadTagihanExcelController extends Controller
             }
             return [
                 'nis' => $nis !== '' ? $nis : null,
-                'name' => $siswa->NMCUST ?? null,
-                'ortu' => $item['ayah'] ?? null,
-                'unit' => $siswa->CODE02 ?? ($item['unit'] ?? null),
-                'kelas' => $siswa->DESC02 ?? ($item['kelas'] ?? null),
-                'kelompok' => $siswa->DESC03 ?? ($item['kelompok'] ?? null),
+                'nodaftar' => $item['nodaftar'] ?? ($siswa->NUM2ND ?? null),
+                'name' => $item['nama'] ?? ($siswa->NMCUST ?? null),
+                'ortu' => $item['ortu'] ?? $item['ayah'] ?? $item['genus'] ?? null,
+                'alamat' => $item['alamat'] ?? null,
+                'gender' => $item['gender'] ?? null,
+                'unit' => $item['unit'] ?? ($siswa->CODE02 ?? null),
+                'kelas' => $item['kelas'] ?? ($siswa->DESC02 ?? null),
+                'kelompok' => $item['kelompok'] ?? ($siswa->DESC03 ?? null),
+                'angkatan' => $item['angkatan'] ?? ($siswa->DESC04 ?? null),
                 'nominal' => $item['nominal'] ?? null,
                 'status' => $item['status'] ?? 0,
                 'keterangan' => $item['keterangan'] ?? null,
