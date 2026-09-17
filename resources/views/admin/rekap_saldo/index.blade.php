@@ -401,7 +401,7 @@
 
                     row.eachCell({includeEmpty: true}, cell => {
                         if (cell.value instanceof Date) {
-                            cell.numFmt = "dddd, dd mmmm yyyy";
+                            cell.numFmt = "[$-421]dddd, dd mmmm yyyy";
                         }
 
                         if (typeof cell.value === "number") {

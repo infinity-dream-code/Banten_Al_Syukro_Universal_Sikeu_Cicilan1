@@ -439,7 +439,7 @@
                 [4, 5].forEach(rowNumber => {
                     const cell = ws.getRow(rowNumber).getCell(2);
 
-                    cell.numFmt = "dddd, dd mmmm yyyy";
+                    cell.numFmt = "[$-421]dddd, dd mmmm yyyy";
                 });
 
                 const boldRows = [1, 2, 3, 4, 5];
@@ -480,7 +480,7 @@
 
                     row.eachCell({ includeEmpty: true }, cell => {
                         if (cell.value instanceof Date) {
-                            cell.numFmt = "dddd, dd mmmm yyyy";
+                            cell.numFmt = "[$-421]dddd, dd mmmm yyyy";
                         }
 
                         if (typeof cell.value === "number") {

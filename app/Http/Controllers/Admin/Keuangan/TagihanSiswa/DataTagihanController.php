@@ -698,45 +698,42 @@ class DataTagihanController extends Controller
 
         $rowperpage = $rowperpage == "poll" ? $totalRecords : $rowperpage;
         $recordsQuery = clone $query;
+        $nisOrderSql = "CAST(NULLIF(TRIM(scctcust.nocust), '') AS UNSIGNED)";
+        $urutanOrderSql = 'CAST(COALESCE(scctbill.FUrutan, 0) AS SIGNED)';
 
         if ($userOrdered) {
             $dir = $columnSortOrder === 'desc' ? 'DESC' : 'ASC';
             if ($columnName === 'scctbill.FUrutan') {
-                $recordsQuery->orderByRaw('CAST(COALESCE(scctbill.FUrutan, 0) AS SIGNED) ' . $dir);
+                $recordsQuery->orderByRaw($urutanOrderSql . ' ' . $dir);
             } elseif ($columnName === 'scctbill.BILLAM') {
                 $recordsQuery->orderByRaw('CAST(COALESCE(scctbill.BILLAM, 0) AS DECIMAL(18,2)) ' . $dir);
             } elseif ($columnName === 'scctbill.PAYMENTLEFT') {
                 $recordsQuery->orderByRaw('CAST(COALESCE(scctbill.PAYMENTLEFT, 0) AS DECIMAL(18,2)) ' . $dir);
             } elseif ($columnName === 'scctbill.BILLPAID') {
                 $recordsQuery->orderByRaw('CAST(COALESCE(scctbill.BILLPAID, 0) AS DECIMAL(18,2)) ' . $dir);
+            } elseif ($columnName === 'scctcust.nocust') {
+                $recordsQuery->orderByRaw($nisOrderSql . ' ' . $dir)
+                    ->orderBy('scctcust.nocust', $columnSortOrder);
             } else {
                 $recordsQuery->orderBy($columnName, $columnSortOrder);
             }
+
+            if ($columnName !== 'scctcust.nocust') {
+                $recordsQuery->orderByRaw($nisOrderSql . ' ASC')
+                    ->orderBy('scctcust.nocust', 'asc');
+            }
+
             $recordsQuery
-                ->orderBy('scctcust.nocust', 'asc')
+                ->orderByRaw($urutanOrderSql . ' ASC')
+                ->orderBy('scctbill.BILLNM', 'asc')
                 ->orderBy('scctbill.AA', 'asc');
         } else {
             $recordsQuery
-                ->orderBy('scctbill.BILLAC')
-                ->orderByRaw("
-                    CASE
-                        WHEN scctbill.BILLNM LIKE '%JULI%' THEN 1
-                        WHEN scctbill.BILLNM LIKE '%AGUSTUS%' THEN 2
-                        WHEN scctbill.BILLNM LIKE '%SEPTEMBER%' THEN 3
-                        WHEN scctbill.BILLNM LIKE '%OKTOBER%' THEN 4
-                        WHEN scctbill.BILLNM LIKE '%NOVEMBER%' THEN 5
-                        WHEN scctbill.BILLNM LIKE '%DESEMBER%' THEN 6
-                        WHEN scctbill.BILLNM LIKE '%JANUARI%' THEN 7
-                        WHEN scctbill.BILLNM LIKE '%FEBRUARI%' THEN 8
-                        WHEN scctbill.BILLNM LIKE '%MARET%' THEN 9
-                        WHEN scctbill.BILLNM LIKE '%APRIL%' THEN 10
-                        WHEN scctbill.BILLNM LIKE '%MEI%' THEN 11
-                        WHEN scctbill.BILLNM LIKE '%JUNI%' THEN 12
-                        ELSE 999
-                    END
-                ")
-                ->orderByRaw('CAST(COALESCE(scctbill.FUrutan, 0) AS SIGNED) ASC')
-                ->orderBy('scctcust.nocust', 'asc');
+                ->orderByRaw($nisOrderSql . ' ASC')
+                ->orderBy('scctcust.nocust', 'asc')
+                ->orderByRaw($urutanOrderSql . ' ASC')
+                ->orderBy('scctbill.BILLNM', 'asc')
+                ->orderBy('scctbill.AA', 'asc');
         }
 
         $rows = $recordsQuery

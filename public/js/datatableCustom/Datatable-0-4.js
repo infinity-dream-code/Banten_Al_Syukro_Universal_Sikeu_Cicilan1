@@ -146,11 +146,11 @@ function dateToExcelSerial(jsDate) {
 }
 
 const EXCEL_DATE_FORMATS = {
-    'basicdate':  { code: 'd mmmm yyyy',                   id: '177' },
-    'date':       { code: 'dddd", "d mmmm yyyy',           id: '178' },
-    'dateformat': { code: 'dddd", "d mmmm yyyy',           id: '178' },
-    'timestamp':  { code: 'dddd", "d mmmm yyyy hh:mm',     id: '179' },
-    'datetime':   { code: 'dddd", "d mmmm yyyy hh:mm',     id: '179' },
+    'basicdate':  { code: '[$-421]d mmmm yyyy',                   id: '177' },
+    'date':       { code: '[$-421]dddd", "d mmmm yyyy',           id: '178' },
+    'dateformat': { code: '[$-421]dddd", "d mmmm yyyy',           id: '178' },
+    'timestamp':  { code: '[$-421]dddd", "d mmmm yyyy hh:mm',     id: '179' },
+    'datetime':   { code: '[$-421]dddd", "d mmmm yyyy hh:mm',     id: '179' },
 };
 
 function addExcelDateStyle(xlsx, formatCode, numFmtId) {
