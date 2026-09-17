@@ -97,7 +97,11 @@
             <div class="card-title">
                 <h5 class="mb-0">{{ $dataTitle ?? $mainTitle }}</h5>
             </div>
-            <div class="card-header-elements ms-auto">
+            <div class="card-header-elements ms-auto d-flex gap-2">
+                <button type="button" class="btn btn-outline-danger js-clear-import" title="Clear data import">
+                    <span class="ri-delete-bin-line me-2"></span>
+                    Clear
+                </button>
                 <button type="button" class="btn btn-whatsapp" data-bs-toggle="modal"
                         data-bs-target="#modal-import" title="Import Excel">
                     <span class="ri-file-excel-2-line me-2"></span>
@@ -167,7 +171,11 @@
             </table>
         </div>
 
-        <div class="card-footer d-flex justify-content-end border-top">
+        <div class="card-footer d-flex justify-content-end gap-2 border-top">
+            <button type="button" class="btn btn-outline-danger js-clear-import">
+                <span class="ri-delete-bin-line me-2"></span>
+                Clear
+            </button>
             <button type="button" class="btn btn-primary" data-bs-toggle="modal"
                     data-bs-target="#modal-validate">
                 <span class="ri-save-line me-2"></span>
@@ -544,6 +552,39 @@
 
             $('#periode_tahun, #periode_bulan').on('change', syncPeriodePreview);
             syncPeriodePreview();
+
+            document.querySelectorAll('.js-clear-import').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    loadingAlert('Membersihkan data import');
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                    const formData = new FormData();
+                    formData.append('_token', csrfToken);
+
+                    fetch('{{ route('admin.keuangan.tagihan-siswa.upload-tagihan-excel.clear') }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: formData,
+                    })
+                        .then(async function (response) {
+                            const payload = await parseJsonResponse(response);
+                            if (!response.ok) {
+                                throw {status: response.status, payload};
+                            }
+                            return payload;
+                        })
+                        .then(function (data) {
+                            successAlert(data.message || 'Data import telah dibersihkan');
+                            dataReload('main_table');
+                        })
+                        .catch(function (error) {
+                            errorAlert((error.payload && error.payload.message) || error.message || 'Gagal membersihkan data import');
+                        });
+                });
+            });
         });
 
     </script>

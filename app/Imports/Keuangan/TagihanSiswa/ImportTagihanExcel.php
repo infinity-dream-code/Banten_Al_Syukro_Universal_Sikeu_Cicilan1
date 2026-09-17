@@ -10,37 +10,48 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class ImportTagihanExcel implements ToCollection, WithHeadingRow
 {
-    /**
-    * @param Collection $collection
-    */
+    public function __construct(private string $cacheKey = 'import_tagihan_excel')
+    {
+    }
 
     public function collection(Collection $collection): void
     {
-        $cacheKey = 'import_tagihan_excel';
         $processedData = [];
 
         foreach ($collection as $row) {
-            if ($row->filter()->isEmpty()) continue;
+            if ($row->filter()->isEmpty()) {
+                continue;
+            }
+
             $rowData = $row->toArray();
+            $nis = trim((string) ($rowData['nis'] ?? ''));
+            $nominal = $rowData['nominal'] ?? null;
+            $nominalBlank = $nominal === null || trim((string) $nominal) === '';
+
+            if ($nis === '' && $nominalBlank) {
+                continue;
+            }
+
+            $rowData['nis'] = $nis;
             $rowData['status'] = 1;
             $status_ket = null;
 
-            if (!isset($rowData['nis'])) {
+            if ($nis === '') {
                 $rowData['status'] = 0;
                 $status_ket = 'NIS tidak boleh kosong';
-            }else {
-                $rowData['nis'] = (string) $rowData['nis'];
-                $checkData = scctcust::where('NOCUST', $rowData['nis'])->first();
+            } else {
+                $checkData = scctcust::where('NOCUST', $nis)->first();
                 if (!$checkData) {
                     $rowData['status'] = 0;
-                    if (!empty($status_ket)) $status_ket .= ', ';
-                    $status_ket .= "NIS {$rowData['nis']} tidak ditemukan";
+                    $status_ket = "NIS {$nis} tidak ditemukan";
                 }
             }
 
-            if (!isset($rowData['nominal'])) {
+            if ($nominalBlank) {
                 $rowData['status'] = 0;
-                if (!empty($status_ket)) $status_ket .= ', ';
+                if (!empty($status_ket)) {
+                    $status_ket .= ', ';
+                }
                 $status_ket .= 'Nominal tidak boleh kosong';
             }
 
@@ -48,8 +59,9 @@ class ImportTagihanExcel implements ToCollection, WithHeadingRow
             $processedData[] = $rowData;
         }
 
+        Cache::forget($this->cacheKey);
         if (!empty($processedData)) {
-            Cache::put($cacheKey, $processedData, now()->addMinutes(60));
+            Cache::put($this->cacheKey, $processedData, now()->addMinutes(60));
         }
     }
 

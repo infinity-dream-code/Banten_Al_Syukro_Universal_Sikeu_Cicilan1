@@ -32,6 +32,7 @@ class UploadTagihanExcelController extends Controller
         $this->middleware(function ($request, $next) {
             if (Auth::check()) {
                 $this->sekolah = Auth::user()->sekolah;
+                $this->cacheKey = 'import_tagihan_excel_' . Auth::id();
             }
 
             return $next($request);
@@ -40,6 +41,7 @@ class UploadTagihanExcelController extends Controller
 
     public function index()
     {
+        Cache::forget('import_tagihan_excel');
         $data['title'] = $this->title;
         $data['mainTitle'] = $this->mainTitle;
         $data['dataTitle'] = $this->dataTitle;
@@ -140,17 +142,20 @@ class UploadTagihanExcelController extends Controller
         ]));
 
         $records = collect($cachedData)->map(function ($item) use ($select){
-            $nis = $item['nis'] ?? null;
-            $siswa = scctcust::select($select)->where('scctcust.NOCUST', $nis);
-            SchoolScope::apply($siswa, 'scctcust', $this->sekolah);
-            $siswa = $siswa->first();
+            $nis = trim((string) ($item['nis'] ?? ''));
+            $siswa = null;
+            if ($nis !== '') {
+                $siswaQuery = scctcust::select($select)->where('scctcust.NOCUST', $nis);
+                SchoolScope::apply($siswaQuery, 'scctcust', $this->sekolah);
+                $siswa = $siswaQuery->first();
+            }
             return [
-                'nis' => $nis,
+                'nis' => $nis !== '' ? $nis : null,
                 'name' => $siswa->NMCUST ?? null,
                 'ortu' => $item['ayah'] ?? null,
-                'unit' => $siswa->CODE02 ?? null,
-                'kelas' => $siswa->DESC02 ?? null,
-                'kelompok' => $siswa->DESC03 ?? null,
+                'unit' => $siswa->CODE02 ?? ($item['unit'] ?? null),
+                'kelas' => $siswa->DESC02 ?? ($item['kelas'] ?? null),
+                'kelompok' => $siswa->DESC03 ?? ($item['kelompok'] ?? null),
                 'nominal' => $item['nominal'] ?? null,
                 'status' => $item['status'] ?? 0,
                 'keterangan' => $item['keterangan'] ?? null,
@@ -209,7 +214,7 @@ class UploadTagihanExcelController extends Controller
             }
 
             DB::beginTransaction();
-            Excel::import(new ImportTagihanExcel(), $file);
+            Excel::import(new ImportTagihanExcel($this->cacheKey), $file);
             DB::commit();
 
             $data = Cache::get($this->cacheKey, []);
@@ -316,6 +321,7 @@ class UploadTagihanExcelController extends Controller
             }
 
             Cache::forget($this->cacheKey);
+            Cache::forget('import_tagihan_excel');
 
             DB::commit();
             $message = "Data tagihan disimpan! Berhasil dibuat untuk {$insertedCount} siswa.";
@@ -338,5 +344,13 @@ class UploadTagihanExcelController extends Controller
                 'error' => $e->getMessage(),
             ], 422);
         }
+    }
+
+    public function clear()
+    {
+        Cache::forget($this->cacheKey);
+        Cache::forget('import_tagihan_excel');
+
+        return response()->json(['message' => 'Data import telah dibersihkan']);
     }
 }
