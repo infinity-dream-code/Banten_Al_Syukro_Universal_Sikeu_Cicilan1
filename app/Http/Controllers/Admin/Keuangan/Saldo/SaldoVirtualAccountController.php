@@ -33,23 +33,25 @@ class SaldoVirtualAccountController extends Controller
     /** Pembayaran manual cash — tidak masuk saldo/jurnal VA. */
     private const FIDBANK_MANUAL_CASH = '1140000';
 
-    /** Hanya transaksi transfer VA; keluarkan manual cash (FIDBANK 1140000 / metode cash). */
-    private function excludeManualCashScope($query, string $fidBankColumn = 'FIDBANK', ?string $metodeColumn = null)
+    /** List saldo: semua jurnal VA kecuali pembayaran Manual Cash (1140000). */
+    private function excludeManualCashScope($query, string $fidBankColumn = 'FIDBANK')
     {
-        $metodeColumn = $metodeColumn ?? (str_contains($fidBankColumn, '.')
-            ? preg_replace('/\.[^.]+$/', '.METODE', $fidBankColumn)
-            : 'METODE');
+        return $query->where(function ($q) use ($fidBankColumn) {
+            $q->whereNull($fidBankColumn)
+                ->orWhere($fidBankColumn, '')
+                ->orWhere($fidBankColumn, '<>', self::FIDBANK_MANUAL_CASH);
+        });
+    }
 
-        return $query
-            ->where(function ($q) use ($fidBankColumn) {
-                $q->whereNull($fidBankColumn)
-                    ->orWhereRaw("TRIM(COALESCE(CAST({$fidBankColumn} AS CHAR), '')) = ''")
-                    ->orWhereRaw("TRIM(COALESCE(CAST({$fidBankColumn} AS CHAR), '')) != ?", [self::FIDBANK_MANUAL_CASH]);
-            })
-            ->whereRaw(
-                "LOWER(TRIM(COALESCE(CAST({$metodeColumn} AS CHAR), ''))) NOT LIKE ?",
-                ['%cash%']
-            );
+    /** Data Transaksi: transfer VA saja, tanpa jurnal metode CASH. */
+    private function transferOnlyScope($query, string $fidBankColumn = 'sccttran.FIDBANK', string $metodeColumn = 'sccttran.METODE')
+    {
+        return $this->excludeManualCashScope($query, $fidBankColumn)
+            ->where(function ($q) use ($metodeColumn) {
+                $q->whereNull($metodeColumn)
+                    ->orWhere($metodeColumn, '')
+                    ->orWhereRaw("{$metodeColumn} NOT LIKE ?", ['%CASH%']);
+            });
     }
 
     private array $allowedFilters = [
@@ -750,7 +752,7 @@ class SaldoVirtualAccountController extends Controller
             'sccttran.METODE',
         ];
 
-        $query = $this->excludeManualCashScope(
+        $query = $this->transferOnlyScope(
             sccttran::query()->leftJoin('scctcust', 'scctcust.CUSTID', '=', 'sccttran.CUSTID'),
             'sccttran.FIDBANK',
             'sccttran.METODE'
@@ -773,7 +775,7 @@ class SaldoVirtualAccountController extends Controller
             });
         }
 
-        $totalRecords = $this->excludeManualCashScope(sccttran::query())->count();
+        $totalRecords = $this->transferOnlyScope(sccttran::query(), 'FIDBANK', 'METODE')->count();
         $totalRecordswithFilter = (clone $query)->count();
 
         $records = (clone $query)
