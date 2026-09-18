@@ -5,13 +5,22 @@ namespace App\Imports\Keuangan\TagihanSiswa;
 use App\Models\scctcust;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class ImportTagihanExcel implements ToCollection, WithHeadingRow
+class ImportTagihanExcel implements WithMultipleSheets, ToCollection, WithHeadingRow, SkipsEmptyRows
 {
     public function __construct(private string $cacheKey = 'import_tagihan_excel')
     {
+    }
+
+    public function sheets(): array
+    {
+        return [
+            0 => $this,
+        ];
     }
 
     public function collection(Collection $collection): void
@@ -23,9 +32,8 @@ class ImportTagihanExcel implements ToCollection, WithHeadingRow
                 continue;
             }
 
-            $rowData = $row->toArray();
-            $nisRaw = $rowData['nis'] ?? '';
-            $nis = is_numeric($nisRaw) ? (string) (int) $nisRaw : trim((string) $nisRaw);
+            $rowData = $this->normalizeRow($row->toArray());
+            $nis = $rowData['nis'] ?? '';
             $nominal = $rowData['nominal'] ?? null;
             $nominalBlank = $nominal === null || trim((string) $nominal) === '';
 
@@ -33,20 +41,6 @@ class ImportTagihanExcel implements ToCollection, WithHeadingRow
                 continue;
             }
 
-            $rowData['nis'] = $nis;
-            $rowData['nama'] = trim((string) ($rowData['nama'] ?? ''));
-            $rowData['unit'] = trim((string) ($rowData['unit'] ?? ''));
-            $rowData['kelas'] = is_numeric($rowData['kelas'] ?? null)
-                ? (string) (int) $rowData['kelas']
-                : trim((string) ($rowData['kelas'] ?? ''));
-            $rowData['kelompok'] = trim((string) ($rowData['kelompok'] ?? ''));
-            $rowData['angkatan'] = trim((string) ($rowData['angkatan'] ?? ''));
-            $rowData['gender'] = trim((string) ($rowData['gender'] ?? '')) ?: null;
-            $rowData['alamat'] = trim((string) ($rowData['alamat'] ?? '')) ?: null;
-            $rowData['ortu'] = trim((string) ($rowData['ortu'] ?? $rowData['genus'] ?? $rowData['ayah'] ?? '')) ?: null;
-            $rowData['nodaftar'] = isset($rowData['nodaftar']) && trim((string) $rowData['nodaftar']) !== ''
-                ? (is_numeric($rowData['nodaftar']) ? (string) (int) $rowData['nodaftar'] : trim((string) $rowData['nodaftar']))
-                : null;
             $rowData['status'] = 1;
             $status_ket = null;
 
@@ -77,6 +71,49 @@ class ImportTagihanExcel implements ToCollection, WithHeadingRow
         if (!empty($processedData)) {
             Cache::put($this->cacheKey, $processedData, now()->addMinutes(60));
         }
+    }
+
+    private function normalizeRow(array $rowData): array
+    {
+        $lookup = [];
+        foreach ($rowData as $key => $value) {
+            $lookup[strtolower(trim((string) $key))] = $value;
+        }
+
+        $pick = function (array $aliases) use ($lookup) {
+            foreach ($aliases as $alias) {
+                if (array_key_exists($alias, $lookup)) {
+                    return $lookup[$alias];
+                }
+            }
+            return null;
+        };
+
+        $nisRaw = $pick(['nis']);
+        $nodaftarRaw = $pick(['nodaftar', 'no_daftar', 'no_pend', 'nopend']);
+        $kelasRaw = $pick(['kelas']);
+        $nominalRaw = $pick(['nominal', 'jumlah', 'tagihan']);
+
+        $nis = $nisRaw === null || trim((string) $nisRaw) === ''
+            ? ''
+            : (is_numeric($nisRaw) ? (string) (int) $nisRaw : trim((string) $nisRaw));
+        $nodaftar = $nodaftarRaw === null || trim((string) $nodaftarRaw) === ''
+            ? null
+            : (is_numeric($nodaftarRaw) ? (string) (int) $nodaftarRaw : trim((string) $nodaftarRaw));
+
+        return [
+            'nis' => $nis,
+            'nodaftar' => $nodaftar,
+            'nama' => trim((string) ($pick(['nama', 'nmcust']) ?? '')),
+            'unit' => trim((string) ($pick(['unit']) ?? '')),
+            'kelas' => is_numeric($kelasRaw) ? (string) (int) $kelasRaw : trim((string) ($kelasRaw ?? '')),
+            'kelompok' => trim((string) ($pick(['kelompok']) ?? '')),
+            'angkatan' => trim((string) ($pick(['angkatan']) ?? '')),
+            'gender' => trim((string) ($pick(['gender', 'jk', 'jenis_kelamin']) ?? '')) ?: null,
+            'alamat' => trim((string) ($pick(['alamat']) ?? '')) ?: null,
+            'ortu' => trim((string) ($pick(['ortu', 'genus', 'ayah', 'wali']) ?? '')) ?: null,
+            'nominal' => $nominalRaw,
+        ];
     }
 
     public function headingRow(): int

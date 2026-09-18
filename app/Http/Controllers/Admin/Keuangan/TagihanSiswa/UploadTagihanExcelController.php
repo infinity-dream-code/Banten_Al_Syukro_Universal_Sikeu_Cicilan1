@@ -201,7 +201,8 @@ class UploadTagihanExcelController extends Controller
 
         try {
             $headingsData = (new HeadingRowImport)->toArray($file);
-            $requiredColumns = ['nis', 'nama', 'unit', 'kelas', 'kelompok', 'angkatan', 'nominal'];
+            $requiredColumns = ['nama', 'unit', 'kelas', 'kelompok', 'angkatan', 'nominal'];
+            $conditionalColumns = ['nis', 'nodaftar'];
             if (empty($headingsData) || !isset($headingsData[0][0])) {
                 throw new \Exception('Tidak dapat membaca judul kolom dari file. Pastikan file memiliki header yang sesuai.');
             }
@@ -210,6 +211,11 @@ class UploadTagihanExcelController extends Controller
                 $headingsData[0][0]
             );
             $missingColumns = [];
+            $hasNis = in_array('nis', $headings, true);
+            $hasNodaftar = in_array('nodaftar', $headings, true);
+            if (!$hasNis && !$hasNodaftar) {
+                $missingColumns[] = 'NIS / NODAFTAR';
+            }
             foreach ($requiredColumns as $column) {
                 if (!in_array($column, $headings, true)) {
                     $missingColumns[] = $column;
@@ -218,8 +224,8 @@ class UploadTagihanExcelController extends Controller
 
             if (!empty($missingColumns)) {
                 $formattedMissingColumns = strtoupper(str_replace('_', ' ', implode(', ', $missingColumns)));
-                $formattedRequiredColumns = strtoupper(str_replace('_', ' ', implode(', ', $requiredColumns)));
-                throw new \Exception("Kolom $formattedMissingColumns tidak ditemukan.<br><hr> pastikan kolom berikut ada dan terisi pada file import yang akan diproses: $formattedRequiredColumns.");
+                $formattedRequiredColumns = strtoupper(str_replace('_', ' ', implode(', ', array_merge($requiredColumns, $conditionalColumns))));
+                throw new \Exception("Kolom $formattedMissingColumns tidak ditemukan.<br><hr> pastikan kolom berikut ada dan terisi pada file import yang akan diproses: $formattedRequiredColumns.<br>Format sama dengan Import Data Siswa, ditambah kolom NOMINAL.");
             }
 
             DB::beginTransaction();

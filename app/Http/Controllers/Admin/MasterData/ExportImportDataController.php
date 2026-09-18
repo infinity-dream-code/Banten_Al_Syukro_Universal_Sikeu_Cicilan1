@@ -166,7 +166,7 @@ class ExportImportDataController extends Controller
             $conditionalColumns = ['nis', 'nodaftar'];
             if (empty($headingsData) || !isset($headingsData[0][0])) throw new \Exception ('Tidak dapat membaca judul kolom dari file. Pastikan file memiliki header yang sesuai.');
             $headings = $headingsData[0][0];
-            $headings = array_map('strtolower', $headings);
+            $headings = array_map(static fn ($heading) => strtolower(trim((string) $heading)), $headings);
             $missingColumns = [];
             $hasNis = in_array('nis', $headings);
             $hasNodaftar = in_array('nodaftar', $headings);
