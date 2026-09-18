@@ -33,14 +33,23 @@ class SaldoVirtualAccountController extends Controller
     /** Pembayaran manual cash — tidak masuk saldo/jurnal VA. */
     private const FIDBANK_MANUAL_CASH = '1140000';
 
-    /** Tampilkan semua transaksi sccttran kecuali manual cash (1140000). */
-    private function excludeManualCashScope($query, string $fidBankColumn = 'FIDBANK')
+    /** Hanya transaksi transfer VA; keluarkan manual cash (FIDBANK 1140000 / metode cash). */
+    private function excludeManualCashScope($query, string $fidBankColumn = 'FIDBANK', ?string $metodeColumn = null)
     {
-        return $query->where(function ($q) use ($fidBankColumn) {
-            $q->whereNull($fidBankColumn)
-                ->orWhereRaw("TRIM(COALESCE(CAST({$fidBankColumn} AS CHAR), '')) = ''")
-                ->orWhereRaw("TRIM(COALESCE(CAST({$fidBankColumn} AS CHAR), '')) != ?", [self::FIDBANK_MANUAL_CASH]);
-        });
+        $metodeColumn = $metodeColumn ?? (str_contains($fidBankColumn, '.')
+            ? preg_replace('/\.[^.]+$/', '.METODE', $fidBankColumn)
+            : 'METODE');
+
+        return $query
+            ->where(function ($q) use ($fidBankColumn) {
+                $q->whereNull($fidBankColumn)
+                    ->orWhereRaw("TRIM(COALESCE(CAST({$fidBankColumn} AS CHAR), '')) = ''")
+                    ->orWhereRaw("TRIM(COALESCE(CAST({$fidBankColumn} AS CHAR), '')) != ?", [self::FIDBANK_MANUAL_CASH]);
+            })
+            ->whereRaw(
+                "LOWER(TRIM(COALESCE(CAST({$metodeColumn} AS CHAR), ''))) NOT LIKE ?",
+                ['%cash%']
+            );
     }
 
     private array $allowedFilters = [
@@ -741,8 +750,11 @@ class SaldoVirtualAccountController extends Controller
             'sccttran.METODE',
         ];
 
-        $query = sccttran::query()
-            ->leftJoin('scctcust', 'scctcust.CUSTID', '=', 'sccttran.CUSTID');
+        $query = $this->excludeManualCashScope(
+            sccttran::query()->leftJoin('scctcust', 'scctcust.CUSTID', '=', 'sccttran.CUSTID'),
+            'sccttran.FIDBANK',
+            'sccttran.METODE'
+        );
 
         foreach ($filters as $filter) {
             if (count($filter) === 3 && ($filter[1] ?? null) === 'in' && is_array($filter[2] ?? null)) {
@@ -761,7 +773,7 @@ class SaldoVirtualAccountController extends Controller
             });
         }
 
-        $totalRecords = sccttran::query()->count();
+        $totalRecords = $this->excludeManualCashScope(sccttran::query())->count();
         $totalRecordswithFilter = (clone $query)->count();
 
         $records = (clone $query)
