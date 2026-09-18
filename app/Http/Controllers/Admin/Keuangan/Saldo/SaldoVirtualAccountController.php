@@ -33,7 +33,7 @@ class SaldoVirtualAccountController extends Controller
     /** Pembayaran manual cash — tidak masuk saldo/jurnal VA. */
     private const FIDBANK_MANUAL_CASH = '1140000';
 
-    /** Hanya transaksi transfer VA; keluarkan manual cash (FIDBANK 1140000 / metode cash). */
+    /** Hanya transaksi transfer VA; keluarkan jurnal cash. */
     private function excludeManualCashScope($query, string $fidBankColumn = 'FIDBANK', ?string $metodeColumn = null)
     {
         $metodeColumn = $metodeColumn ?? (str_contains($fidBankColumn, '.')
@@ -43,13 +43,14 @@ class SaldoVirtualAccountController extends Controller
         return $query
             ->where(function ($q) use ($fidBankColumn) {
                 $q->whereNull($fidBankColumn)
-                    ->orWhereRaw("TRIM(COALESCE(CAST({$fidBankColumn} AS CHAR), '')) = ''")
-                    ->orWhereRaw("TRIM(COALESCE(CAST({$fidBankColumn} AS CHAR), '')) != ?", [self::FIDBANK_MANUAL_CASH]);
+                    ->orWhere($fidBankColumn, '')
+                    ->orWhere($fidBankColumn, '<>', self::FIDBANK_MANUAL_CASH);
             })
-            ->whereRaw(
-                "LOWER(TRIM(COALESCE(CAST({$metodeColumn} AS CHAR), ''))) NOT LIKE ?",
-                ['%cash%']
-            );
+            ->where(function ($q) use ($metodeColumn) {
+                $q->whereNull($metodeColumn)
+                    ->orWhere($metodeColumn, '')
+                    ->orWhereRaw("UPPER(TRIM({$metodeColumn})) NOT LIKE ?", ['%CASH%']);
+            });
     }
 
     private array $allowedFilters = [
@@ -754,7 +755,7 @@ class SaldoVirtualAccountController extends Controller
             sccttran::query()->leftJoin('scctcust', 'scctcust.CUSTID', '=', 'sccttran.CUSTID'),
             'sccttran.FIDBANK',
             'sccttran.METODE'
-        );
+        )->whereRaw("IFNULL(sccttran.METODE, '') NOT LIKE ?", ['%CASH%']);
 
         foreach ($filters as $filter) {
             if (count($filter) === 3 && ($filter[1] ?? null) === 'in' && is_array($filter[2] ?? null)) {
