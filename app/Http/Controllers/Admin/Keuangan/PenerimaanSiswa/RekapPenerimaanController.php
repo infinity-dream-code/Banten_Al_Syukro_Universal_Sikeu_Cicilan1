@@ -111,6 +111,10 @@ class RekapPenerimaanController extends Controller
 
     private function resolveMetodeLabel(object $item, array $metodeBayarMap): string
     {
+        if (strtoupper(trim((string) ($item->METODE ?? ''))) === 'FROM INVOICE') {
+            return 'TOP UP';
+        }
+
         $displayFid = MetodeBayarHelper::resolveDisplayFidBank(
             $item->BILL_FIDBANK ?? $item->FIDBANK ?? null,
             $item->BILL_NOREFF ?? null
