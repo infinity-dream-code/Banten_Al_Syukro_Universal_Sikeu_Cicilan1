@@ -141,6 +141,16 @@ Route::prefix("admin")
                         Route::resource("", \App\Http\Controllers\Admin\Keuangan\TagihanSiswa\UploadTagihanExcelController::class)->parameters(["" => "id"]);
                     });
                 });
+
+                Route::prefix("upload-tagihan-lunas-excel")->name("upload-tagihan-lunas-excel.")->group(function () {
+                    Route::controller(\App\Http\Controllers\Admin\Keuangan\TagihanSiswa\UploadTagihanLunasExcelController::class)->group(function () {
+                        Route::get("get-data", "getData")->name("get-data");
+                        Route::get("get-column", "getColumn")->name("get-column");
+                        Route::post("validate-excel", "validateExcel")->name("validate-excel");
+                        Route::post("clear", "clear")->name("clear");
+                        Route::resource("", \App\Http\Controllers\Admin\Keuangan\TagihanSiswa\UploadTagihanLunasExcelController::class)->parameters(["" => "id"]);
+                    });
+                });
             });
 
             Route::prefix("penerimaan-siswa")->name("penerimaan-siswa.")->group(function () {

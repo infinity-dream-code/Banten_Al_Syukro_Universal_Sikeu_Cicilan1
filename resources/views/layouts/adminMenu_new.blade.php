@@ -85,6 +85,11 @@
                                 <div data-i18n="Buat Tagihan Excel">Buat Tagihan Excel</div>
                             </a>
                         </li>
+                        <li class="menu-item {{ Request::is(['admin/keuangan/tagihan-siswa/upload-tagihan-lunas-excel*']) ? 'active' : '' }}">
+                            <a href="{{ route('admin.keuangan.tagihan-siswa.upload-tagihan-lunas-excel.index') }}" class="menu-link">
+                                <div data-i18n="Buat Tagihan Lunas Excel">Buat Tagihan Lunas Excel</div>
+                            </a>
+                        </li>
                         <li class="menu-item {{ Request::is(['admin/keuangan/tagihan-siswa/data-tagihan*']) ? 'active' : '' }}">
                             <a href="{{ route('admin.keuangan.tagihan-siswa.data-tagihan.index') }}" class="menu-link">
                                 <div data-i18n="Data Tagihan">Data Tagihan</div>
