@@ -18,7 +18,7 @@ return [
 
     'name' => env('APP_NAME', 'Al Syukro Universal'),
     'nama_instansi' => env('APP_NAMA_INSTANSI', 'Al Syukro Universal'),
-    'alamat' => env('APP_ALAMAT', 'Kota Semarang, Prov. Jawa Tengah'),
+    'alamat' => env('APP_ALAMAT', 'Gg. H. Maung No.30, Ciputat, Kec. Ciputat, Kota Tangerang Selatan, Banten 15411'),
     'logo' => env('APP_LOGO', 'icon.png'),
     'logo_mime' => match (strtolower(pathinfo((string) env('APP_LOGO', 'icon.png'), PATHINFO_EXTENSION))) {
         'png' => 'image/png',
@@ -30,7 +30,7 @@ return [
     },
     'email' => env('APP_EMAIL', 'ypisabkho@gmail.com'),
     'telepon' => env('APP_TELEPON', 'SIKEU'),
-    'domisili' => env('APP_DOMISILI', 'Semarang'),
+    'domisili' => env('APP_DOMISILI', 'Tangerang Selatan'),
     'nova' => env('APP_NOVA') ?: '96240',
     'biaya_admin' => env('BIAYA_ADMIN', 0),
     'dummy_seeder' => env('DUMMY_SEEDER',false),
