@@ -1605,7 +1605,7 @@ async function getDT(options) {
                                     }
                                     const descriptions = {
                                         '1140000': 'Manual Cash',
-                                        '1140001': 'Manual BMI',
+                                        '1140001': 'Manual BCAS',
                                         '1140002': 'Manual SALDO',
                                         '1140003': 'Transfer Bank Lain',
                                         '1140004': 'Transfer Bank BNI',

@@ -25,7 +25,7 @@ class MetodeBayarHelper
      * - scctbill.NOREFF = Mobile → ANDROID (FIDBANK apa saja)
      * - selain itu pakai scctbill.FIDBANK
      *   1140000 + MNL → Manual Cash
-     *   1140001 + MNL → Manual BMI
+     *   1140001 + MNL → Manual BCAS
      *   1140002 + MNL → Manual SALDO
      *   1140003 → Transfer Bank Lain
      */
