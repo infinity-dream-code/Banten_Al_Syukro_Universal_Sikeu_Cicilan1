@@ -158,10 +158,6 @@
                                 title="tutup"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-primary mb-3">
-                            Field mengikuti kolom Excel import: <strong>NIS / NODAFTAR, Nama, Unit, Kelas, Kelompok, Angkatan</strong>
-                            (opsional: Gender, Alamat, Ortu). Data masuk ke preview dulu, lalu klik <strong>Simpan Data</strong>.
-                        </div>
                         <fieldset class="form-fieldset">
                             <div class="row">
                                 <div class="col-md-6">
