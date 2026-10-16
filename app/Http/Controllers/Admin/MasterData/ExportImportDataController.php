@@ -57,7 +57,7 @@ class ExportImportDataController extends Controller
                 'nama' => ['required', 'string', 'max:100'],
                 'id_kelas' => ['required'],
                 'angkatan' => ['required', 'string'],
-                'nis' => ['nullable', 'numeric'],
+                'nis' => ['required', 'numeric'],
                 'nodaftar' => ['nullable', 'numeric'],
                 'gender' => ['nullable', 'string', 'max:20'],
                 'alamat' => ['nullable', 'string', 'max:255'],
@@ -78,15 +78,6 @@ class ExportImportDataController extends Controller
 
         $nis = trim((string) ($request->nis ?? ''));
         $nodaftar = trim((string) ($request->nodaftar ?? ''));
-        if ($nis === '' && $nodaftar === '') {
-            return response()->json([
-                'message' => 'NIS atau No Pendaftaran wajib diisi salah satu.',
-                'errors' => [
-                    'nis' => ['NIS atau No Pendaftaran wajib diisi salah satu.'],
-                    'nodaftar' => ['NIS atau No Pendaftaran wajib diisi salah satu.'],
-                ],
-            ], 422);
-        }
 
         $kelas = mst_kelas::find($request->id_kelas);
         if (!$kelas) {

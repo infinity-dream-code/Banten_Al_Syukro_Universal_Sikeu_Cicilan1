@@ -162,9 +162,9 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label" for="tambah-nis">NIS</label>
+                                        <label class="form-label required" for="tambah-nis">NIS</label>
                                         <input type="text" class="form-control numberOnly" name="nis" id="tambah-nis"
-                                               autocomplete="off" placeholder="NIS (atau isi No Pendaftaran)">
+                                               autocomplete="off" placeholder="NIS" required>
                                         <div class="invalid-feedback" role="alert"></div>
                                     </div>
                                     <div class="mb-3">
