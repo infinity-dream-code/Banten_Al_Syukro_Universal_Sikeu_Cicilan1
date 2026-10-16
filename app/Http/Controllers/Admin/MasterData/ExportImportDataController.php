@@ -41,8 +41,105 @@ class ExportImportDataController extends Controller
             ->when($schoolCode, fn ($q) => $q->where('CODE01', $schoolCode))
             ->orderBy('DESC01')
             ->get();
+        $data['kelas'] = mst_kelas::getMstKelasAttributes($schoolCode);
+        $data['thn_aka'] = mst_thn_aka::orderBy('thn_aka', 'desc')->get();
 
         return view('admin.master_data.export_import_data.index', $data);
+    }
+
+    /**
+     * Tambah 1 baris siswa ke preview (format sama dengan kolom Excel), sebelum Simpan Data.
+     */
+    public function storeManual(Request $request)
+    {
+        $request->validate(
+            [
+                'nama' => ['required', 'string', 'max:100'],
+                'id_kelas' => ['required'],
+                'angkatan' => ['required', 'string'],
+                'nis' => ['nullable', 'numeric'],
+                'nodaftar' => ['nullable', 'numeric'],
+                'gender' => ['nullable', 'string', 'max:20'],
+                'alamat' => ['nullable', 'string', 'max:255'],
+                'ortu' => ['nullable', 'string', 'max:100'],
+            ],
+            ValidationMessage::messages(),
+            array_merge(ValidationMessage::attributes(), [
+                'nama' => 'Nama',
+                'id_kelas' => 'Kelas',
+                'angkatan' => 'Angkatan',
+                'nis' => 'NIS',
+                'nodaftar' => 'No Pendaftaran',
+                'gender' => 'Jenis Kelamin',
+                'alamat' => 'Alamat',
+                'ortu' => 'Ortu / Wali',
+            ])
+        );
+
+        $nis = trim((string) ($request->nis ?? ''));
+        $nodaftar = trim((string) ($request->nodaftar ?? ''));
+        if ($nis === '' && $nodaftar === '') {
+            return response()->json([
+                'message' => 'NIS atau No Pendaftaran wajib diisi salah satu.',
+                'errors' => [
+                    'nis' => ['NIS atau No Pendaftaran wajib diisi salah satu.'],
+                    'nodaftar' => ['NIS atau No Pendaftaran wajib diisi salah satu.'],
+                ],
+            ], 422);
+        }
+
+        $kelas = mst_kelas::find($request->id_kelas);
+        if (!$kelas) {
+            return response()->json(['message' => 'Kelas tidak ditemukan, silahkan muat ulang halaman.'], 422);
+        }
+
+        $angkatan = trim((string) $request->angkatan);
+        if (!mst_thn_aka::where('thn_aka', $angkatan)->exists()) {
+            return response()->json([
+                'message' => "Angkatan tidak ditemukan ({$angkatan}). Buat dulu di Tahun Akademik.",
+                'errors' => ['angkatan' => ["Angkatan tidak ditemukan ({$angkatan})."]],
+            ], 422);
+        }
+
+        $rowData = [
+            'nis' => $nis !== '' ? $nis : null,
+            'nodaftar' => $nodaftar !== '' ? $nodaftar : null,
+            'nama' => trim((string) $request->nama),
+            'unit' => trim((string) ($kelas->unit ?? '')),
+            'kelas' => trim((string) ($kelas->jenjang ?? '')),
+            'kelompok' => trim((string) ($kelas->kelas ?? '')),
+            'angkatan' => $angkatan,
+            'gender' => trim((string) ($request->gender ?? '')) ?: null,
+            'alamat' => trim((string) ($request->alamat ?? '')) ?: null,
+            'ortu' => trim((string) ($request->ortu ?? '')) ?: null,
+            'status' => 1,
+            'keterangan' => null,
+        ];
+
+        $statusKet = null;
+        if ($rowData['nis'] && scctcust::where('NOCUST', $rowData['nis'])->exists()) {
+            $rowData['status'] = 2;
+            $statusKet = "Siswa dengan NIS {$rowData['nis']} sudah ada, data akan diupdate";
+        }
+        if ($rowData['nodaftar'] && scctcust::where('NUM2ND', $rowData['nodaftar'])->exists()) {
+            $rowData['status'] = 2;
+            $statusKet = $statusKet
+                ? $statusKet . ", Siswa dengan nodaftar {$rowData['nodaftar']} sudah ada, data akan diupdate"
+                : "Siswa dengan nodaftar {$rowData['nodaftar']} sudah ada, data akan diupdate";
+        }
+        $rowData['keterangan'] = $statusKet;
+
+        $cached = Cache::get($this->cacheKey, []);
+        if (!is_array($cached)) {
+            $cached = [];
+        }
+        $cached[] = $rowData;
+        Cache::put($this->cacheKey, $cached, now()->addMinutes(60));
+
+        return response()->json([
+            'message' => 'Siswa ditambahkan ke daftar preview. Klik Simpan Data untuk menyimpan ke database.',
+            'data' => $rowData,
+        ], 200);
     }
 
     public function getColumn()

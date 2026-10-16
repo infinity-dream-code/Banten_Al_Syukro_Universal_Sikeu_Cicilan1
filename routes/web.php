@@ -67,6 +67,7 @@ Route::prefix("admin")
                     Route::get("get-data", "getData")->name("get-data");
                     Route::get("get-column", "getColumn")->name("get-column");
                     Route::post("validate-data", "validateData")->name("validate-data");
+                    Route::post("store-manual", "storeManual")->name("store-manual");
                     Route::get("clear-data", "clearData")->name("clear-data");
                     Route::resource("", \App\Http\Controllers\Admin\MasterData\ExportImportDataController::class)->parameters(["" => "id"]);
                 });

@@ -41,11 +41,18 @@
                 <h5 class="mb-0 me-2">{{($dataTitle??$mainTitle)}}</h5>
             </div>
             <div class="card-header-elements ms-auto">
-                <button type="button" class="btn btn-whatsapp" data-bs-toggle="modal"
-                        data-bs-target="#modal-import" title="Buat Data">
-                    <span class="ri-file-excel-2-line me-2"></span>
-                    Import Data Siswa
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-whatsapp" data-bs-toggle="modal"
+                            data-bs-target="#modal-import" title="Import Excel">
+                        <span class="ri-file-excel-2-line me-2"></span>
+                        Import Data Siswa
+                    </button>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                            data-bs-target="#modal-tambah-siswa" title="Tambah Siswa">
+                        <span class="ri-user-add-line me-2"></span>
+                        Tambah Siswa
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -131,6 +138,118 @@
                                 </div>
                                 <div class="col">
                                     <input type="submit" value="Import Data" class="btn btn-primary w-100">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <form id="formTambahSiswa" class="mainForm" method="POST">
+        <div class="modal modal-blur fade" id="modal-tambah-siswa" tabindex="-1" role="dialog" aria-hidden="true"
+             data-bs-backdrop="static">
+            <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Tambah Siswa</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
+                                title="tutup"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-primary mb-3">
+                            Field mengikuti kolom Excel import: <strong>NIS / NODAFTAR, Nama, Unit, Kelas, Kelompok, Angkatan</strong>
+                            (opsional: Gender, Alamat, Ortu). Data masuk ke preview dulu, lalu klik <strong>Simpan Data</strong>.
+                        </div>
+                        <fieldset class="form-fieldset">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="tambah-nis">NIS</label>
+                                        <input type="text" class="form-control numberOnly" name="nis" id="tambah-nis"
+                                               autocomplete="off" placeholder="NIS (atau isi No Pendaftaran)">
+                                        <div class="invalid-feedback" role="alert"></div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label required" for="tambah-nama">Nama</label>
+                                        <input type="text" class="form-control" name="nama" id="tambah-nama"
+                                               autocomplete="off" placeholder="Nama siswa" required>
+                                        <div class="invalid-feedback" role="alert"></div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label required" for="tambah-id_kelas">Kelas (Unit / Kelas / Kelompok)</label>
+                                        <select class="form-select" name="id_kelas" id="tambah-id_kelas" required
+                                                data-control="select2" data-placeholder="Pilih kelas">
+                                            <option value="">Pilih kelas</option>
+                                            @isset($kelas)
+                                                @foreach($kelas as $item)
+                                                    <option value="{{ $item->id }}">
+                                                        {{ $item->unit }} - {{ $item->jenjang }} {{ $item->kelas }}
+                                                    </option>
+                                                @endforeach
+                                            @endisset
+                                        </select>
+                                        <div class="form-text">Setara kolom Excel: Unit, Kelas, Kelompok.</div>
+                                        <div class="invalid-feedback" role="alert"></div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="tambah-gender">Gender</label>
+                                        <select class="form-select" name="gender" id="tambah-gender"
+                                                data-control="select2" data-placeholder="Opsional">
+                                            <option value="">-</option>
+                                            <option value="Laki-Laki">Laki-Laki</option>
+                                            <option value="Perempuan">Perempuan</option>
+                                        </select>
+                                        <div class="invalid-feedback" role="alert"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="tambah-nodaftar">No Pendaftaran (NODAFTAR)</label>
+                                        <input type="text" class="form-control numberOnly" name="nodaftar"
+                                               id="tambah-nodaftar" autocomplete="off"
+                                               placeholder="No pendaftaran (atau isi NIS)">
+                                        <div class="invalid-feedback" role="alert"></div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="tambah-ortu">Ortu / Wali</label>
+                                        <input type="text" class="form-control" name="ortu" id="tambah-ortu"
+                                               autocomplete="off" placeholder="Nama ortu / wali">
+                                        <div class="invalid-feedback" role="alert"></div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label required" for="tambah-angkatan">Angkatan</label>
+                                        <select class="form-select" name="angkatan" id="tambah-angkatan" required
+                                                data-control="select2" data-placeholder="Pilih angkatan">
+                                            <option value="">Pilih angkatan</option>
+                                            @isset($thn_aka)
+                                                @foreach($thn_aka as $item)
+                                                    <option value="{{ $item->thn_aka }}">{{ $item->thn_aka }}</option>
+                                                @endforeach
+                                            @endisset
+                                        </select>
+                                        <div class="invalid-feedback" role="alert"></div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="tambah-alamat">Alamat</label>
+                                        <textarea class="form-control" name="alamat" id="tambah-alamat" rows="3"
+                                                  placeholder="Alamat"></textarea>
+                                        <div class="invalid-feedback" role="alert"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="w-100">
+                            <div class="row">
+                                <div class="col">
+                                    <input type="reset" value="Batal" class="btn btn-outline-secondary w-100"
+                                           data-bs-dismiss="modal">
+                                </div>
+                                <div class="col">
+                                    <input type="submit" value="Tambah ke Preview" class="btn btn-primary w-100">
                                 </div>
                             </div>
                         </div>
@@ -371,9 +490,13 @@
                     let $this = $(this);
                     // select2Focus($this);
                     $this.wrap('<div class="position-relative"></div>').select2({
-                        placeholder: 'Select value',
+                        placeholder: $this.data('placeholder') || 'Pilih',
                         language: 'id',
-                        dropdownParent: $this.parent()
+                        dropdownParent: $this.closest('.modal').length
+                            ? $this.closest('.modal')
+                            : $this.parent(),
+                        width: '100%',
+                        allowClear: true,
                     });
                 });
             }
@@ -397,7 +520,11 @@
                         loadingAlert('Meng-unggah data siswa');
                         url = '{{route('admin.master-data.export-import-data.store')}}';
                         method = 'POST';
-                    }else if (formId === "formValidate"){
+                    } else if (formId === "formTambahSiswa") {
+                        loadingAlert('Menambahkan siswa ke preview');
+                        url = '{{route('admin.master-data.export-import-data.store-manual')}}';
+                        method = 'POST';
+                    } else if (formId === "formValidate"){
                         loadingAlert('Menyimpan data siswa');
                         url = '{{route('admin.master-data.export-import-data.validate-data')}}';
                         method = 'POST';
@@ -445,7 +572,7 @@
                                 const errors = error.error.error || error.error.errors;
                                 errorAlert(error.error.message);
                                 if (errors) {
-                                    processErrors(errors)
+                                    processErros(errors);
                                 }
                             } else {
                                 const errorMessages = {
