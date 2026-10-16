@@ -165,6 +165,7 @@
                                         <label class="form-label required" for="tambah-nis">NIS</label>
                                         <input type="text" class="form-control numberOnly" name="nis" id="tambah-nis"
                                                autocomplete="off" placeholder="NIS" required>
+                                        <div class="form-text" id="tambah-nis-hint"></div>
                                         <div class="invalid-feedback" role="alert"></div>
                                     </div>
                                     <div class="mb-3">
@@ -456,6 +457,86 @@
             )
 
             initializeFilePond('file');
+
+            const nisInput = document.getElementById('tambah-nis');
+            const nisHint = document.getElementById('tambah-nis-hint');
+            let nisCheckTimer = null;
+            let nisCheckAbort = null;
+
+            function setNisHint(text, type) {
+                if (!nisHint) return;
+                nisHint.textContent = text || '';
+                nisHint.classList.remove('text-success', 'text-danger', 'text-muted');
+                if (type === 'ok') nisHint.classList.add('text-success');
+                else if (type === 'used') nisHint.classList.add('text-danger');
+                else nisHint.classList.add('text-muted');
+            }
+
+            function checkNisAvailability(nis) {
+                if (!nisHint) return;
+                if (!nis) {
+                    setNisHint('', 'muted');
+                    return;
+                }
+                if (!/^\d+$/.test(nis)) {
+                    setNisHint('NIS harus berupa angka.', 'used');
+                    return;
+                }
+
+                setNisHint('Memeriksa NIS...', 'muted');
+                if (nisCheckAbort) {
+                    nisCheckAbort.abort();
+                }
+                nisCheckAbort = new AbortController();
+
+                fetch('{{ route('admin.master-data.export-import-data.check-nis') }}?nis=' + encodeURIComponent(nis), {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    signal: nisCheckAbort.signal,
+                })
+                    .then(function (response) {
+                        if (!response.ok) throw new Error('gagal');
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        if (data.exists) {
+                            setNisHint(data.message || 'NIS sudah dipakai.', 'used');
+                        } else {
+                            setNisHint(data.message || 'NIS tersedia.', 'ok');
+                        }
+                    })
+                    .catch(function (err) {
+                        if (err.name === 'AbortError') return;
+                        setNisHint('', 'muted');
+                    });
+            }
+
+            if (nisInput) {
+                nisInput.addEventListener('input', function () {
+                    clearTimeout(nisCheckTimer);
+                    const value = (this.value || '').trim();
+                    if (!value) {
+                        setNisHint('', 'muted');
+                        return;
+                    }
+                    nisCheckTimer = setTimeout(function () {
+                        checkNisAvailability(value);
+                    }, 400);
+                });
+                nisInput.addEventListener('blur', function () {
+                    clearTimeout(nisCheckTimer);
+                    checkNisAvailability((this.value || '').trim());
+                });
+            }
+
+            document.getElementById('modal-tambah-siswa')?.addEventListener('hidden.bs.modal', function () {
+                clearTimeout(nisCheckTimer);
+                if (nisCheckAbort) nisCheckAbort.abort();
+                setNisHint('', 'muted');
+            });
 
             if (dtOptions.dataUrl && dtOptions.columnUrl) {
                 getDT(dtOptions);

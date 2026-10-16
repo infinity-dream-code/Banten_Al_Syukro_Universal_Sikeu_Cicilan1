@@ -48,6 +48,38 @@ class ExportImportDataController extends Controller
     }
 
     /**
+     * Cek cepat apakah NIS sudah dipakai (1 query EXISTS — ringan).
+     */
+    public function checkNis(Request $request)
+    {
+        $nis = trim((string) $request->query('nis', ''));
+        if ($nis === '' || !ctype_digit($nis)) {
+            return response()->json([
+                'exists' => false,
+                'message' => '',
+            ]);
+        }
+
+        $siswa = scctcust::query()
+            ->select(['NOCUST', 'NMCUST'])
+            ->where('NOCUST', $nis)
+            ->first();
+
+        if (!$siswa) {
+            return response()->json([
+                'exists' => false,
+                'message' => 'NIS tersedia.',
+            ]);
+        }
+
+        return response()->json([
+            'exists' => true,
+            'message' => 'NIS sudah dipakai' . ($siswa->NMCUST ? ' oleh ' . $siswa->NMCUST : '') . '.',
+            'nama' => $siswa->NMCUST,
+        ]);
+    }
+
+    /**
      * Tambah 1 baris siswa ke preview (format sama dengan kolom Excel), sebelum Simpan Data.
      */
     public function storeManual(Request $request)
