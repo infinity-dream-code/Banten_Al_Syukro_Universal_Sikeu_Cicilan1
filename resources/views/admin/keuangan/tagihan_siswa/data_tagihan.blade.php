@@ -517,6 +517,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.12/vfs_fonts.min.js"
             integrity="sha512-EFlschXPq/G5zunGPRSYqazR1CMKj0cQc8v6eMrQwybxgIbhsfoO5NAMQX3xFDQIbFlViv53o7Hy+yCWw6iZxA=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    @include('partials.pdf_kop_assets')
 
     <script type="text/javascript">
         const select2 = $(`[data-control='select2']`);
@@ -1323,40 +1324,25 @@
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
                     // Header (shared)
-                    const headerTable = {
-                        alignment: 'center',
-                        table: {
-                            widths: [60, '*'],
-                            body: [[
-                                logo ? {
-                                    image: logo,
-                                    width: 60,
-                                    alignment: 'center'
-                                } : '',
-                                {
-                                    stack: [
-                                        instansi.nama_sub_1 ? {
-                                            text: instansi.nama_sub_1.toUpperCase(),
-                                            style: 'headerSmall'
-                                        } : '',
-                                        instansi.nama_sub_2 ? {
-                                            text: instansi.nama_sub_2.toUpperCase(),
-                                            style: 'headerSmall'
-                                        } : '',
-                                        {text: instansi.nama_instansi.toUpperCase(), style: 'headerBig'},
-                                        instansi.akreditasi ? {text: instansi.akreditasi, style: 'headerSmall'} : '',
-                                        instansi.alamat ? {text: instansi.alamat, style: 'headerSmall'} : '',
-                                        {
-                                            text: `Telp: ${instansi.kontak.telepon || '-'} | Email: ${instansi.kontak.email || '-'} | Web: ${instansi.kontak.website || '-'}`,
-                                            style: 'headerSmall'
-                                        }
-                                    ],
-                                    alignment: 'center'
-                                }
-                            ]]
-                        },
-                        layout: 'noBorders'
-                    };
+                                        const headerTable = (typeof buildPdfKopHeader === 'function')
+                        ? buildPdfKopHeader(logo)
+                        : {
+                            alignment: 'center',
+                            table: {
+                                widths: [60, '*'],
+                                body: [[
+                                    logo ? { image: logo, width: 60, alignment: 'center' } : '',
+                                    {
+                                        stack: [
+                                            { text: (instansi.nama_instansi || '').toUpperCase(), style: 'headerBig' },
+                                            instansi.alamat ? { text: instansi.alamat, style: 'headerSmall' } : '',
+                                        ],
+                                        alignment: 'center'
+                                    }
+                                ]]
+                            },
+                            layout: 'noBorders'
+                        };
 
                     // Footer (shared)
                     const footer = {

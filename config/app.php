@@ -17,8 +17,8 @@ return [
     */
 
     'name' => env('APP_NAME', 'Al Syukro Universal'),
-    'nama_instansi' => env('APP_NAMA_INSTANSI', 'Al Syukro Universal'),
-    'alamat' => env('APP_ALAMAT', 'Gg. H. Maung No.30, Ciputat, Kec. Ciputat, Kota Tangerang Selatan, Banten 15411'),
+    'nama_instansi' => env('APP_NAMA_INSTANSI', 'Perguruan Islam Al Syukro Universal'),
+    'alamat' => env('APP_ALAMAT', 'Jl. Otista Raya Gg. H. Maung No. 30, Ciputat - Tangerang Selatan.'),
     'logo' => env('APP_LOGO', 'icon.png'),
     'logo_mime' => match (strtolower(pathinfo((string) env('APP_LOGO', 'icon.png'), PATHINFO_EXTENSION))) {
         'png' => 'image/png',
@@ -28,6 +28,9 @@ return [
         'ico' => 'image/x-icon',
         default => 'image/jpeg',
     },
+    // Logo mitra di kop surat / kuitansi (kanan): Dompet Dhuafa + Great Edunesia
+    'logo_dompet_dhuafa' => env('APP_LOGO_DOMPET_DHUAFA', 'logo-dompet-dhuafa.png'),
+    'logo_great_edunesia' => env('APP_LOGO_GREAT_EDUNESIA', 'great-edunesia.png'),
     'email' => env('APP_EMAIL', 'ypisabkho@gmail.com'),
     'telepon' => env('APP_TELEPON', 'SIKEU'),
     'domisili' => env('APP_DOMISILI', 'Tangerang Selatan'),

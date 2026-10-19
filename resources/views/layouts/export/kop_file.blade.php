@@ -106,43 +106,43 @@
 </head>
 <body>
 
+@php
+    $logoPath = public_path(config('app.logo'));
+    $logoMime = config('app.logo_mime');
+    $logoSchool = is_file($logoPath)
+        ? 'data:' . $logoMime . ';base64,' . base64_encode(file_get_contents($logoPath))
+        : null;
+
+    $dompetPath = public_path(config('app.logo_dompet_dhuafa', 'logo-dompet-dhuafa.png'));
+    $logoDompet = is_file($dompetPath)
+        ? 'data:image/png;base64,' . base64_encode(file_get_contents($dompetPath))
+        : null;
+
+    $edunesiaPath = public_path(config('app.logo_great_edunesia', 'great-edunesia.png'));
+    $logoEdunesia = is_file($edunesiaPath)
+        ? 'data:image/png;base64,' . base64_encode(file_get_contents($edunesiaPath))
+        : null;
+@endphp
 <table width="100%" class="">
-    <tr class="">
-        <td style="text-align: center; vertical-align: middle;">
-            @php
-                $logoPath = public_path(config('app.logo'));
-                $logoMime = config('app.logo_mime');
-            @endphp
-            <img src="data:{{ $logoMime }};base64,{{ base64_encode(file_get_contents($logoPath)) }}" style="max-height: 5rem; display: block; margin: auto;" alt="logo"/>
+    <tr>
+        <td width="18%" style="text-align: center; vertical-align: middle;">
+            @if($logoSchool)
+                <img src="{{ $logoSchool }}" style="max-height: 4.5rem; display: block; margin: auto;" alt="logo"/>
+            @endif
         </td>
-        <td>
+        <td width="54%" style="vertical-align: middle;">
             <table style="width: 100%;">
                 <tr>
                     <td align="center">
                         @if(config('app.nama_sub_instansi_1'))<h3>{{config('app.nama_sub_instansi_1')}}</h3>@endif
                         @if(config('app.nama_sub_instansi_2'))<h3>{{config('app.nama_sub_instansi_2')}}</h3>@endif
-                        <h2>{{config('app.nama_instansi')}}</h2>
+                        <h2 style="margin: 0;">{{config('app.nama_instansi')}}</h2>
                     </td>
                 </tr>
                 @if(config('app.akreditasi'))
                     <tr>
                         <td align="center">
-                            <h3> {{config('app.akreditasi')}} </h3>
-                        </td>
-                    </tr>
-                @endif
-                @if(config('app.NDS') || config('app.NPSN') || config('app.NSS'))
-                    <tr style="font-size: 10pt;">
-                        <td align="center">
-                            @if(config('app.NDS'))
-                                NDS: {{config('app.NDS')}}@if(config('app.NPSN') || config('app.NSS')),@endif
-                            @endif
-                            @if(config('app.NPSN'))
-                                NPSN: {{config('app.NPSN')}}@if(config('app.NSS')),@endif
-                            @endif
-                            @if(config('app.NSS'))
-                                NSS: {{config('app.NSS') }}
-                            @endif
+                            <h3>{{config('app.akreditasi')}}</h3>
                         </td>
                     </tr>
                 @endif
@@ -151,21 +151,22 @@
                         {{config('app.alamat')}}
                     </td>
                 </tr>
-                @if(config('app.telepon') || config('app.email') || config('app.website'))
-                    <tr style="font-size: 10pt;">
-                        <td align="center">
-                            @if(config('app.telepon'))
-                                No. Telp: {{config('app.telepon')}}@if(config('app.email') || config('app.website')),@endif
-                            @endif
-                            @if(config('app.email'))
-                                E-mail: {{config('app.email')}}@if(config('app.website')),@endif
-                            @endif
-                            @if(config('app.website'))
-                                Website: {{config('app.website') }}
-                            @endif
+            </table>
+        </td>
+        <td width="28%" style="text-align: center; vertical-align: middle;">
+            <table width="100%">
+                <tr>
+                    @if($logoDompet)
+                        <td align="center" style="padding: 0 4px;">
+                            <img src="{{ $logoDompet }}" style="max-height: 2.4rem; max-width: 5.2rem;" alt="Dompet Dhuafa"/>
                         </td>
-                    </tr>
-                @endif
+                    @endif
+                    @if($logoEdunesia)
+                        <td align="center" style="padding: 0 4px;">
+                            <img src="{{ $logoEdunesia }}" style="max-height: 2.4rem; max-width: 5.2rem;" alt="Great Edunesia"/>
+                        </td>
+                    @endif
+                </tr>
             </table>
         </td>
     </tr>
