@@ -150,7 +150,7 @@
                                     <option value="all">Semua</option>
                                     @isset($periode)
                                         @foreach($periode as $item)
-                                            <option value="{{$item}}">{{$item}}</option>
+                                            <option value="{{ $item }}">{{ \App\Support\PeriodeHelper::label($item) }}</option>
                                         @endforeach
                                     @else
                                         <option>data kosong</option>
@@ -492,7 +492,7 @@
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
     <script src="{{asset('js/va-format.js')}}?v=20260619"></script>
-    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260917-id-weekday"></script>
+    <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20261019-periode-bulan-2"></script>
     <script>
         window.DATA_TAGIHAN_BOOT = {
             columnUrl: @json($columnsUrl ?? null),
@@ -526,6 +526,22 @@
             const value = Number(amount);
             if (!Number.isFinite(value)) return 'Rp 0';
             return 'Rp. ' + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+
+        function formatPeriodeLabel(periode) {
+            const raw = (periode == null ? '' : String(periode)).trim();
+            if (!raw) return '-';
+            if (/^\d{6}$/.test(raw)) {
+                const months = [
+                    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+                ];
+                const month = parseInt(raw.substring(4, 6), 10);
+                if (month >= 1 && month <= 12) {
+                    return months[month - 1] + ' ' + raw.substring(0, 4);
+                }
+            }
+            return raw;
         }
 
         let dtOptions = {
@@ -1614,7 +1630,7 @@
                         tableBody.push([
                             {text: String(index + 1), alignment: 'center', border: [true, true, true, true]},
                             {text: tanggalBayar, border: [true, true, true, true]},
-                            {text: item.BILLAC || '-', border: [true, true, true, true]},
+                            {text: formatPeriodeLabel(item.BILLAC), border: [true, true, true, true]},
                             {text: item.BILLNM || '-', border: [true, true, true, true]},
                             {text: formatRupiah(jumlahTagihan), alignment: 'right', border: [true, true, true, true]},
                             {text: formatRupiah(jumlahBayar), alignment: 'right', border: [true, true, true, true]},

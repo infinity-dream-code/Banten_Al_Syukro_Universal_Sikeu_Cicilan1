@@ -1347,16 +1347,27 @@ async function getDT(options) {
                             case 'periode':
                             case 'yearmonth':
                                 renderFunc = function (data, type, row) {
-                                    if (!data || typeof data !== 'string' || data.length !== 6 || !/^\d{6}$/.test(data)) {
-                                        return '';
+                                    const raw = data == null ? '' : String(data).trim();
+                                    if (type !== 'display' && type !== 'filter' && type !== 'export') {
+                                        return raw;
                                     }
-                                    const monthsIndonesian = [
-                                        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-                                        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-                                    ];
-                                    const year = Math.floor(data / 100);
-                                    const month = data % 100;
-                                    return (month >= 1 && month <= 12) ? `${monthsIndonesian[month - 1]} ${year}` : '';
+                                    if (!raw) {
+                                        return '-';
+                                    }
+                                    // YYYYMM → "September 2026"
+                                    if (/^\d{6}$/.test(raw)) {
+                                        const monthsIndonesian = [
+                                            "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                                            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                                        ];
+                                        const year = raw.substring(0, 4);
+                                        const month = parseInt(raw.substring(4, 6), 10);
+                                        return (month >= 1 && month <= 12)
+                                            ? `${monthsIndonesian[month - 1]} ${year}`
+                                            : raw;
+                                    }
+                                    // YYYY saja (tagihan tanpa bulan) → tetap tampil
+                                    return raw;
                                 };
                                 break;
                             case 'timestamp':

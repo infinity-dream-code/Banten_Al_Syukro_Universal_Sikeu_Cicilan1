@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\ValidationMessage;
 use App\Support\CacheHandler;
 use App\Support\FilterHandler;
+use App\Support\PeriodeHelper;
 use App\Support\TagihanPaymentReversal;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -153,7 +154,7 @@ class DataTagihanController extends Controller
             ['data' => 'BILLAM', 'name' => 'Sisa Tagihan', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end', 'exportable' => true],
             ['data' => 'BILLPAID', 'name' => 'Jumlah Terbayar', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end', 'exportable' => true],
             ['data' => 'PAIDDT', 'name' => 'Tanggal Bayar', 'searchable' => true, 'orderable' => true, 'columnType' => 'timestamp', 'exportable' => true],
-            ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'exportable' => true],
+            ['data' => 'BILLAC', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'exportable' => true, 'columnType' => 'periode'],
             [
                 'data' => 'FUrutan',
                 'name' => 'Urutan',
@@ -774,7 +775,7 @@ class DataTagihanController extends Controller
                     'BILLAM' => $get('PAYMENTLEFT'),
                     'BILLPAID' => $get('BILLPAID'),
                     'PAYMENTLEFT' => $get('PAYMENTLEFT'),
-                    'BILLAC' => $get('BILLAC'),
+                    'BILLAC' => PeriodeHelper::label($get('BILLAC')),
                     'BTA' => $get('BTA'),
                     'PAIDST' => $get('PAIDST'),
                     'INSTALLMENT' => (int) ($get('INSTALLMENT') ?? 0),
