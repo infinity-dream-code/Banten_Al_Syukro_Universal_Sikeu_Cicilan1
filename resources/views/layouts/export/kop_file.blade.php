@@ -134,21 +134,12 @@
             <table style="width: 100%;">
                 <tr>
                     <td align="center">
-                        @if(config('app.nama_sub_instansi_1'))<h3>{{config('app.nama_sub_instansi_1')}}</h3>@endif
-                        @if(config('app.nama_sub_instansi_2'))<h3>{{config('app.nama_sub_instansi_2')}}</h3>@endif
-                        <h2 style="margin: 0;">{{config('app.nama_instansi')}}</h2>
+                        <h2 style="margin: 0;">{{ config('app.nama_instansi') }}</h2>
                     </td>
                 </tr>
-                @if(config('app.akreditasi'))
-                    <tr>
-                        <td align="center">
-                            <h3>{{config('app.akreditasi')}}</h3>
-                        </td>
-                    </tr>
-                @endif
                 <tr style="font-size: 10pt;">
                     <td align="center">
-                        {{config('app.alamat')}}
+                        {{ config('app.alamat') }}
                     </td>
                 </tr>
             </table>
@@ -156,14 +147,14 @@
         <td width="28%" style="text-align: center; vertical-align: middle;">
             <table width="100%">
                 <tr>
-                    @if($logoDompet)
-                        <td align="center" style="padding: 0 4px;">
-                            <img src="{{ $logoDompet }}" style="max-height: 2.4rem; max-width: 5.2rem;" alt="Dompet Dhuafa"/>
-                        </td>
-                    @endif
                     @if($logoEdunesia)
                         <td align="center" style="padding: 0 4px;">
                             <img src="{{ $logoEdunesia }}" style="max-height: 2.4rem; max-width: 5.2rem;" alt="Great Edunesia"/>
+                        </td>
+                    @endif
+                    @if($logoDompet)
+                        <td align="center" style="padding: 0 4px;">
+                            <img src="{{ $logoDompet }}" style="max-height: 2.4rem; max-width: 5.2rem;" alt="Dompet Dhuafa"/>
                         </td>
                     @endif
                 </tr>

@@ -17,8 +17,8 @@ return [
     */
 
     'name' => env('APP_NAME', 'Al Syukro Universal'),
-    'nama_instansi' => env('APP_NAMA_INSTANSI', 'Perguruan Islam Al Syukro Universal'),
-    'alamat' => env('APP_ALAMAT', 'Jl. Otista Raya Gg. H. Maung No. 30, Ciputat - Tangerang Selatan.'),
+    'nama_instansi' => env('APP_NAMA_INSTANSI', 'PERGURUAN ISLAM AL SYUKRO UNIVERSAL'),
+    'alamat' => env('APP_ALAMAT', 'Jl. Otista Raya Gg. H. Maung No.30, Ciputat - Tangerang Selatan'),
     'logo' => env('APP_LOGO', 'icon.png'),
     'logo_mime' => match (strtolower(pathinfo((string) env('APP_LOGO', 'icon.png'), PATHINFO_EXTENSION))) {
         'png' => 'image/png',

@@ -29,36 +29,29 @@
         const school = leftLogo || assets.schoolLogo || '';
         const stack = [];
 
-        if (assets.namaSub1) {
-            stack.push({ text: String(assets.namaSub1).toUpperCase(), style: 'headerSmall' });
-        }
-        if (assets.namaSub2) {
-            stack.push({ text: String(assets.namaSub2).toUpperCase(), style: 'headerSmall' });
-        }
+        // Nama + alamat saja (persis kop Al Syukro)
         stack.push({
             text: String(assets.namaInstansi || '').toUpperCase(),
             style: 'headerBig',
             margin: [0, 0, 0, 2],
         });
-        if (assets.akreditasi) {
-            stack.push({ text: assets.akreditasi, style: 'headerSmall' });
-        }
         if (assets.alamat) {
             stack.push({ text: assets.alamat, style: 'headerSmall', margin: [0, 2, 0, 0] });
         }
 
+        // Urutan: Great Edunesia (kiri) lalu Dompet Dhuafa (kanan)
         const partnerLogos = [];
-        if (assets.dompetLogo) {
+        if (assets.edunesiaLogo) {
             partnerLogos.push({
-                image: assets.dompetLogo,
+                image: assets.edunesiaLogo,
                 width: 52,
                 alignment: 'center',
                 margin: [0, 0, 4, 0],
             });
         }
-        if (assets.edunesiaLogo) {
+        if (assets.dompetLogo) {
             partnerLogos.push({
-                image: assets.edunesiaLogo,
+                image: assets.dompetLogo,
                 width: 52,
                 alignment: 'center',
                 margin: [4, 0, 0, 0],
