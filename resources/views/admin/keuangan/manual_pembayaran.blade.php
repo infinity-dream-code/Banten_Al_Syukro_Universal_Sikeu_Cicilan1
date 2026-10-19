@@ -208,6 +208,7 @@
             integrity="sha512-EFlschXPq/G5zunGPRSYqazR1CMKj0cQc8v6eMrQwybxgIbhsfoO5NAMQX3xFDQIbFlViv53o7Hy+yCWw6iZxA=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     @include('partials.pdf_kop_assets')
+    @include('partials.kuitansi_alsyukro')
 
     <script type="text/javascript">
         $(function () {
@@ -586,7 +587,12 @@
                     const data = await generateKuitansi(result);
                     if (!data || !data.data) throw createError('Gagal membuat kuitansi', 422);
 
-                    await generatePdf('KUITANSI', data.data, data.unit || false);
+                    await generatePdf(
+                        (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN UANG SEKOLAH'),
+                        data.data,
+                        data.unit || false,
+                        { titleUnderline: true, skipFooter: true }
+                    );
                 } catch (error) {
                     if (error.status === 422) {
                         errorAlert(error.message);
@@ -784,8 +790,9 @@
                 return descriptions[String(data)] || data;
             }
 
-            async function generatePdf(title, bodyContent, unit_logo) {
+            async function generatePdf(title, bodyContent, unit_logo, options) {
                 unit_logo = unit_logo || false;
+                options = options || {};
                 try {
                     let logo = 'data:{{ config('app.logo_mime') }};base64,' + headerLogo;
                     if (unit_logo) logo = await getLogoUnit(unit_logo);
@@ -836,12 +843,22 @@
                         {
                             margin: [0, 5, 0, 5],
                             canvas: [
-                                { type: 'line', x1: 0, y1: 0, x2: availableWidth, y2: 0, lineWidth: 2 },
-                                { type: 'line', x1: 0, y1: 3, x2: availableWidth, y2: 3, lineWidth: 0.5, lineColor: '#888' }
+                                { type: 'line', x1: 0, y1: 0, x2: availableWidth, y2: 0, lineWidth: 1 },
                             ]
                         },
-                        { text: title, style: 'title', margin: [0, 5, 0, 5] }
-                    ].concat(bodyContent).concat([footer]);
+                    ];
+                    if (title) {
+                        content.push({
+                            text: title,
+                            style: 'title',
+                            decoration: options.titleUnderline ? 'underline' : undefined,
+                            margin: [0, 6, 0, 8],
+                        });
+                    }
+                    content.push.apply(content, bodyContent || []);
+                    if (!options.skipFooter) {
+                        content.push(footer);
+                    }
 
                     const docDefinition = {
                         pageSize: 'A4',
@@ -849,15 +866,15 @@
                         pageMargins: pageMargins,
                         content: content,
                         styles: {
-                            headerBig: { fontSize: 16, bold: true, alignment: 'center' },
-                            headerSmall: { fontSize: 12, alignment: 'center' },
-                            title: { fontSize: 14, bold: true, alignment: 'center' },
+                            headerBig: { fontSize: 14, bold: true, alignment: 'center' },
+                            headerSmall: { fontSize: 9, alignment: 'center' },
+                            title: { fontSize: 13, bold: true, alignment: 'center' },
                             subTitle: { fontSize: 12, bold: true },
                             tableHeader: { bold: true, fillColor: '#ededed', alignment: 'center' },
                             small: { fontSize: 9, alignment: 'center' },
                             tableFont: { fontSize: 5 }
                         },
-                        defaultStyle: { font: 'Times' }
+                        defaultStyle: { font: 'Times', fontSize: 10 }
                     };
 
                     pdfMake.createPdf(docDefinition).open();
@@ -877,85 +894,25 @@
 
             async function generateKuitansi(data) {
                 try {
-                    const bodyContent = [];
-                    let siswa = data.siswa;
-                    const namaSiswa = siswa.NMCUST || siswa.nmcust || '-';
+                    const siswa = data.siswa || {};
                     const paymentBank = data.bank || '';
                     const firstTagihan = data.tagihans && data.tagihans[0] ? data.tagihans[0] : {};
                     const fidBank = paymentBank || firstTagihan.FIDBANK || '';
                     const biayaLayanan = (data.biaya_layanan !== undefined && data.biaya_layanan !== null)
                         ? Number(data.biaya_layanan)
                         : (fidBank === '1140002' ? 0 : 2000);
-                    let nocust = !siswa.NOCUST || siswa.NOCUST === '' || siswa.NOCUST === '-' ? false : siswa.NOCUST;
-                    const uniqueMetode = [];
-                    data.tagihans.forEach(function (item) {
-                        const m = String(item.FIDBANK || paymentBank || '');
-                        if (m && uniqueMetode.indexOf(m) === -1) uniqueMetode.push(m);
-                    });
-                    const metodeLabel = paymentBank
-                        ? formatMetodePembayaran(paymentBank, firstTagihan.NOREFF)
-                        : (uniqueMetode.length > 1 ? 'Beragam' : formatMetodePembayaran(fidBank, firstTagihan.NOREFF));
-                    const ortu = siswa.GENUS || siswa.genus || '-';
 
-                    const mainTable = [
-                        [(nocust ? 'NIS ' : 'No. Pendaftaran'), ': ' + (nocust ? nocust : (siswa.NUM2ND || '-')), 'Unit', ': ' + (siswa.CODE02 || '-')],
-                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : '-'), 'Kelas', ': ' + (siswa.DESC02 || '') + ' ' + (siswa.DESC03 || '')],
-                        ['Nama ', ': ' + namaSiswa, 'Orang Tua', ': ' + ortu],
-                        ['Metode Bayar', ': ' + metodeLabel, '', ''],
-                    ];
-
-                    bodyContent.push(
-                        { table: { widths: ['15%', '35%', '15%', '35%'], body: mainTable }, layout: 'noBorders' },
-                        { text: '', margin: [0, 5, 0, 5] }
-                    );
-
-                    const tableBody = [];
-                    tableBody.push(['#', 'Nama Tagihan', 'Periode', 'Tagihan', 'Bayar', 'Metode', 'Tanggal Bayar'].map(function (h) { return { text: h, style: 'tableHeader' }; }));
-
-                    let totalBayar = 0;
-                    data.tagihans.forEach(function (item, index) {
-                        const billAm = Number(item.BILLAM || 0);
-                        const nominalBayar = Number(item.NOMINAL_BAYAR !== undefined ? item.NOMINAL_BAYAR : (item.BILLAM || 0));
-                        const itemFidBank = item.FIDBANK || paymentBank || '';
-                        const tanggalBayar = formatTanggalBayar(item.PAIDDT);
-                        totalBayar += nominalBayar;
-                        tableBody.push([
-                            { text: index + 1, alignment: 'center' },
-                            { text: item.BILLNM, alignment: 'left' },
-                            { text: item.BTA, alignment: 'left' },
-                            { text: formatRupiah(billAm), alignment: 'right' },
-                            { text: formatRupiah(nominalBayar), alignment: 'right' },
-                            { text: formatMetodePembayaran(itemFidBank, item.NOREFF), alignment: 'left' },
-                            { text: tanggalBayar, alignment: 'left' },
-                        ]);
-                    });
-
-                    if (biayaLayanan > 0) {
-                        tableBody.push([
-                            { colSpan: 4, text: 'Total Tagihan', alignment: 'right', style: 'tableHeader' }, {}, {}, {},
-                            { text: formatRupiah(totalBayar), alignment: 'right' }, {}, {}
-                        ]);
-                        tableBody.push([
-                            { colSpan: 4, text: 'Biaya Layanan', alignment: 'right', style: 'tableHeader' }, {}, {}, {},
-                            { text: formatRupiah(biayaLayanan), alignment: 'right' }, {}, {}
-                        ]);
-                    }
-
-                    tableBody.push([
-                        { colSpan: 4, text: 'Total', alignment: 'right', style: 'tableHeader' }, {}, {}, {},
-                        { text: formatRupiah(totalBayar + biayaLayanan), alignment: 'right' }, {}, {}
-                    ]);
-
-                    bodyContent.push({
-                        table: { widths: ['3%', '22%', '11%', '14%', '14%', '16%', '20%'], body: tableBody },
-                        layout: {
-                            fillColor: function (rowIndex) { return rowIndex === 0 ? '#ededed' : null; },
-                            hLineWidth: function () { return 0.5; },
-                            vLineWidth: function () { return 0.5; }
-                        },
-                        margin: [0, 0, 0, 10],
-                        fontSize: 12
-                    });
+                    const bodyContent = (typeof buildKuitansiAlSyukroBody === 'function')
+                        ? buildKuitansiAlSyukroBody({
+                            siswa: siswa,
+                            tagihans: data.tagihans || [],
+                            bank: paymentBank,
+                            biayaLayanan: biayaLayanan,
+                            tandaTangan: typeof tandaTangan !== 'undefined' ? tandaTangan : null,
+                            userName: typeof userName !== 'undefined' ? userName : 'Admin Keuangan',
+                            formatMetode: formatMetodePembayaran,
+                        })
+                        : [];
 
                     const forPdf = [];
                     forPdf['unit'] = siswa.CODE02;

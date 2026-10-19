@@ -176,6 +176,8 @@
     <div class="line thin"></div>
 </div>
 @yield('content')
+@hasSection('hide_default_footer')
+@else
 <table class="main-table" style="width: 100%; padding-top: 0.425rem">
     <tfoot>
     <tr>
@@ -190,6 +192,7 @@
     </tr>
     </tfoot>
 </table>
+@endif
 
 </body>
 </html>

@@ -194,6 +194,7 @@
             integrity="sha512-EFlschXPq/G5zunGPRSYqazR1CMKj0cQc8v6eMrQwybxgIbhsfoO5NAMQX3xFDQIbFlViv53o7Hy+yCWw6iZxA=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     @include('partials.pdf_kop_assets')
+    @include('partials.kuitansi_alsyukro')
 
     <script type="text/javascript">
         let dataColumns = [];
@@ -588,7 +589,12 @@
                         throw createError("Data Tagihan Kosong", 422);
                     }
                     const data = await generateKuitansi(result);
-                    const pdf = await generatePdf('KUITANSI', data.data, data.unit ?? false)
+                    const pdf = await generatePdf(
+                        (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN UANG SEKOLAH'),
+                        data.data,
+                        data.unit ?? false,
+                        { titleUnderline: true, skipFooter: true }
+                    )
                     // if (!result['tagihans'] || result['tagihans'].length === 0) {
                     //     console.log('kosong');
                     //     const error = new Error("Data Tagihan Kosong");
@@ -885,7 +891,7 @@
                 return descriptions[data] || data;
             }
 
-            async function generatePdf(title, bodyContent, unit_logo = false) {
+            async function generatePdf(title, bodyContent, unit_logo = false, options = {}) {
                 try {
                     let logo = 'data:{{ config('app.logo_mime') }};base64,' + headerLogo;
 
@@ -1010,118 +1016,37 @@
                 });
             }
 
-            async function generateKuitansi(data) {
+                        async function generateKuitansi(data) {
                 try {
-                    const bodyContent = [];
-
-                    let siswa = data.siswa;
-                    const namaSiswa = siswa.NMCUST ?? siswa.nmcust ?? '-';
-                    const paymentBank = data.bank ?? '';
-                    const fidBank = paymentBank || data.tagihans?.[0]?.FIDBANK ?? '';
+                    const siswa = data.siswa || {};
+                    const paymentBank = data.bank || '';
+                    const firstTagihan = data.tagihans && data.tagihans[0] ? data.tagihans[0] : {};
+                    const fidBank = paymentBank || firstTagihan.FIDBANK || '';
                     const biayaLayanan = (data.biaya_layanan !== undefined && data.biaya_layanan !== null)
                         ? Number(data.biaya_layanan)
                         : (fidBank === '1140002' ? 0 : 2000);
-                    let nocust = siswa.NOCUST === null || siswa.NOCUST === '' || siswa.NOCUST === '-' || !siswa.NOCUST ? false : siswa.NOCUST;
-                    const uniqueMetode = [...new Set(data.tagihans.map(item => String(item.FIDBANK ?? paymentBank ?? '')))].filter(Boolean);
-                    const metodeLabel = paymentBank
-                        ? formatMetodePembayaran(paymentBank)
-                        : (uniqueMetode.length > 1
-                            ? 'Beragam'
-                            : formatMetodePembayaran(fidBank));
 
-                    const mainTable = [
-                        [(nocust ? 'NIS ' : 'No. Pendaftaran'), ': ' + (nocust ? nocust : siswa.NUM2ND), 'Unit', ': ' + siswa.CODE02],
-                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : ''), 'Kelas', ': ' + (siswa.DESC02 ?? '') + ' ' + (siswa.DESC03 ?? '')],
-                        ['Nama ', ': ' + namaSiswa, 'Orang Tua', ': ' + (siswa.GENUS ?? siswa.genus ?? '-')],
-                        ['Metode Bayar', ': ' + metodeLabel, '', ''],
-                    ]
-
-                    bodyContent.push({
-                            table: {
-                                widths: ['15%', '35%', '15%', '35%'],
-                                body: mainTable
-                            },
-                            layout: 'noBorders'
-                        },
-                        {
-                            text: '',
-                            margin: [0, 5, 0, 5]
-                        }
-                    );
-
-                    const tableBody = [];
-                    tableBody.push(
-                        ['#', 'Nama Tagihan', 'Periode', 'Tagihan', 'Bayar', 'Metode', 'Tanggal Bayar']
-                            .map(h => ({text: h, style: 'tableHeader'})),
-                    );
-
-                    let totalBayar = 0;
-
-                    let tagihans = data.tagihans;
-                    tagihans.forEach((item, index) => {
-                        const billAm = Number(item.BILLAM ?? 0);
-                        const nominalBayar = Number(item.NOMINAL_BAYAR ?? item.BILLAM ?? 0);
-                        const itemFidBank = item.FIDBANK ?? paymentBank ?? '';
-                        const tanggalBayar = formatTanggalBayar(item.PAIDDT);
-
-                        totalBayar += nominalBayar;
-
-                        tableBody.push([
-                            {text: index + 1, alignment: 'center'},
-                            {text: item.BILLNM, alignment: 'left'},
-                            {text: item.BTA, alignment: 'left'},
-                            {text: formatRupiah(billAm), alignment: 'right'},
-                            {text: formatRupiah(nominalBayar), alignment: 'right'},
-                            {text: formatMetodePembayaran(itemFidBank), alignment: 'left'},
-                            {text: tanggalBayar, alignment: 'left'},
-                        ]);
-                    })
-
-                    if (biayaLayanan > 0) {
-                        tableBody.push([
-                            {colSpan: 4, text: 'Total Tagihan', alignment: 'right', style: 'tableHeader'},
-                            {}, {}, {},
-                            {text: formatRupiah(totalBayar), alignment: 'right'},
-                            {}, {}
-                        ])
-
-                        tableBody.push([
-                            {colSpan: 4, text: 'Biaya Layanan', alignment: 'right', style: 'tableHeader'},
-                            {}, {}, {},
-                            {text: formatRupiah(biayaLayanan), alignment: 'right'},
-                            {}, {}
-                        ])
-                    }
-
-                    tableBody.push([
-                        {colSpan: 4, text: 'Total', alignment: 'right', style: 'tableHeader'},
-                        {}, {}, {},
-                        {text: formatRupiah(totalBayar + biayaLayanan), alignment: 'right'},
-                        {}, {}
-                    ])
-
-                    bodyContent.push({
-                        table: {
-                            widths: ['3%', '22%', '11%', '14%', '14%', '16%', '20%'],
-                            body: tableBody,
-                        },
-                        layout: {
-                            fillColor: (rowIndex) => rowIndex === 0 ? '#ededed' : null,
-                            hLineWidth: () => 0.5,
-                            vLineWidth: () => 0.5
-                        },
-                        margin: [0, 0, 0, 10],
-                        fontSize: 12
-                    });
+                    const bodyContent = (typeof buildKuitansiAlSyukroBody === 'function')
+                        ? buildKuitansiAlSyukroBody({
+                            siswa: siswa,
+                            tagihans: data.tagihans || [],
+                            bank: paymentBank,
+                            biayaLayanan: biayaLayanan,
+                            tandaTangan: typeof tandaTangan !== 'undefined' ? tandaTangan : null,
+                            userName: typeof userName !== 'undefined' ? userName : 'Admin Keuangan',
+                            formatMetode: formatMetodePembayaran,
+                        })
+                        : [];
 
                     const forPdf = [];
                     forPdf['unit'] = siswa.CODE02;
                     forPdf['data'] = bodyContent;
                     return forPdf;
                 } catch (e) {
-                    console.log(e)
+                    console.log(e);
                 }
             }
+
 
             async function generatePDFTagihan(data) {
                 try {

@@ -393,6 +393,7 @@
             integrity="sha512-EFlschXPq/G5zunGPRSYqazR1CMKj0cQc8v6eMrQwybxgIbhsfoO5NAMQX3xFDQIbFlViv53o7Hy+yCWw6iZxA=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     @include('partials.pdf_kop_assets')
+    @include('partials.kuitansi_alsyukro')
 
     {{--    <script src="{{asset('main/libs/select2/select2.full.min.js')}}"></script>--}}
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
@@ -911,7 +912,7 @@
                     return APP_VA_PREFIX + digits.padStart(16 - APP_VA_PREFIX.length, '0');
                 })();
 
-            async function generatePdf(title, bodyContent, unit_logo = false) {
+            async function generatePdf(title, bodyContent, unit_logo = false, options = {}) {
                 try {
                     let logo = 'data:{{ config('app.logo_mime') }};base64,' + headerLogo;
 
@@ -926,7 +927,7 @@
                     });
                     const availableWidth = getContentWidth('A4', orientation, pageMargins);
 
-                                        const headerTable = (typeof buildPdfKopHeader === 'function')
+                    const headerTable = (typeof buildPdfKopHeader === 'function')
                         ? buildPdfKopHeader(logo)
                         : {
                             alignment: 'center',
@@ -975,22 +976,22 @@
                         {
                             margin: [0, 5, 0, 5],
                             canvas: [
-                                {type: 'line', x1: 0, y1: 0, x2: availableWidth, y2: 0, lineWidth: 2},
-                                {
-                                    type: 'line',
-                                    x1: 0,
-                                    y1: 3,
-                                    x2: availableWidth,
-                                    y2: 3,
-                                    lineWidth: 0.5,
-                                    lineColor: '#888'
-                                }
+                                {type: 'line', x1: 0, y1: 0, x2: availableWidth, y2: 0, lineWidth: 1},
                             ]
                         },
-                        {text: String(title || '').toUpperCase(), style: 'title', margin: [0, 5, 0, 5]},
-                        ...bodyContent,
-                        footer
                     ];
+                    if (title) {
+                        content.push({
+                            text: String(title || ''),
+                            style: 'title',
+                            decoration: options.titleUnderline ? 'underline' : undefined,
+                            margin: [0, 6, 0, 8],
+                        });
+                    }
+                    content.push(...(bodyContent || []));
+                    if (!options.skipFooter) {
+                        content.push(footer);
+                    }
 
                     // PDF definition
                     const docDefinition = {
@@ -1302,108 +1303,46 @@
                 }
 
                 let siswa = data[0];
-                let nocust = siswa.nocust === null || siswa.nocust === '' || siswa.nocust === '-' || !siswa.nocust ? false : siswa.nocust;
-                const uniqueMetode = [...new Set(data.map(item => String(item.FIDBANK ?? '')))].filter(Boolean);
-                const metodeLabel = uniqueMetode.length > 1
-                    ? 'Beragam'
-                    : formatMetodePembayaran(siswa.FIDBANK ?? '', siswa.BILL_NOREFF ?? '');
+                const tagihans = data.map(item => ({
+                    AA: item.item_id ?? item.AA,
+                    BILLCD: item.BILLCD,
+                    BILLNM: item.BILLNM,
+                    BILLAC: item.BILLAC,
+                    BTA: item.BTA,
+                    NOMINAL_BAYAR: Number(item.BILLAM ?? item.DEBET ?? 0),
+                    BILLAM: Number(item.BILLAM_TOTAL ?? item.BILLAM ?? 0),
+                    PAIDDT: item.PAIDDT ?? item.TRXDATE,
+                    FIDBANK: item.FIDBANK,
+                    NOREFF: item.BILL_NOREFF ?? item.NOREFF,
+                    TRANSNO: item.TRANSNO ?? item.BILL_TRANSNO,
+                }));
 
-                const mainTable = [
-                    [(nocust ? 'NIS ' : 'No. Pendaftaran'), ': ' + (nocust ? nocust : siswa.NUM2ND), 'Unit', ': ' + siswa.CODE02],
-                    [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : ''), 'Kelas', ': ' + (siswa.DESC02 ?? '') + ' ' + (siswa.DESC03 ?? '')],
-                    ['Nama ', ': ' + siswa.nmcust, 'Ayah', ': ' + (siswa.GENUS ?? '-')],
-                    ['Metode Bayar', ': ' + metodeLabel, 'Ibu', ': ' + (siswa.GENUS1 ?? '')],
-                ]
-
-                let content = [];
-                const headerContent = [
-                    {
-                        table: {
-                            widths: ['15%', '35%', '15%', '35%'],
-                            body: mainTable
+                const content = (typeof buildKuitansiAlSyukroBody === 'function')
+                    ? buildKuitansiAlSyukroBody({
+                        siswa: {
+                            ...siswa,
+                            NMCUST: siswa.nmcust || siswa.NMCUST,
+                            DESC02: siswa.DESC02,
+                            DESC03: siswa.DESC03,
+                            CODE02: siswa.CODE02,
                         },
-                        layout: 'noBorders'
-                    },
-                    {
-                        text: '',
-                        margin: [0, 5, 0, 5]
-                    },
-                ]
+                        tagihans: tagihans,
+                        bank: siswa.FIDBANK,
+                        biayaLayanan: biayaLayanan ? 2000 : 0,
+                        tandaTangan: typeof tandaTangan !== 'undefined' ? tandaTangan : null,
+                        userName: typeof userName !== 'undefined' ? userName : 'Admin Keuangan',
+                        formatMetode: formatMetodePembayaran,
+                        nomor: tagihans[0]?.TRANSNO || tagihans[0]?.NOREFF || null,
+                    })
+                    : [];
 
-                content.push(headerContent);
-
-                const tableBody = [];
-                tableBody.push(
-                    ['#', 'Nama Tagihan', 'Periode', 'Tagihan', 'Bayar', 'Metode', 'Tanggal Bayar']
-                        .map(h => ({text: h, style: 'tableHeader'})),
-                );
-
-                let totalTagihan = 0;
-                let totalBayar = 0;
-
-                data.forEach((item, index) => {
-                    let tanggalBayar = item.PAIDDT ?? item.TRXDATE;
-                    if (tanggalBayar && tanggalBayar !== '' && tanggalBayar !== '0000-00-00 00:00:00') {
-                        tanggalBayar = new Date(tanggalBayar).toLocaleDateString('id-ID', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                        });
-                    }
-
-                    const billAm = Number(item.BILLAM_TOTAL ?? item.BILLAM ?? 0);
-                    const billPaid = Number(item.BILLAM ?? item.DEBET ?? 0);
-                    totalTagihan += billAm;
-                    totalBayar += billPaid;
-
-                    tableBody.push([
-                        {text: index + 1, alignment: 'center'},
-                        {text: item.BILLNM, alignment: 'left'},
-                        {text: item.BILLAC ?? item.BTA ?? '-', alignment: 'left'},
-                        {text: formatRupiah(billAm), alignment: 'right'},
-                        {text: formatRupiah(billPaid), alignment: 'right'},
-                        {text: formatMetodePembayaran(item.FIDBANK ?? '', item.BILL_NOREFF ?? ''), alignment: 'left'},
-                        {text: tanggalBayar, alignment: 'left'},
-                    ]);
-                })
-
-                if (biayaLayanan) {
-                    tableBody.push([
-                        {colSpan: 4, text: 'Biaya Layanan', alignment: 'right', style: 'tableHeader'},
-                        {}, {}, {},
-                        {text: formatRupiah(2000), alignment: 'right'},
-                        {}, {}
-                    ])
-                }
-
-                tableBody.push([
-                    {colSpan: 4, text: 'Total', alignment: 'right', style: 'tableHeader'},
-                    {}, {}, {},
-                    {text: formatRupiah(totalBayar + (biayaLayanan ? 2000 : 0)), alignment: 'right'},
-                    {}, {}
-                ])
-
-                content.push({
-                    table: {
-                        widths: ['3%', '22%', '11%', '14%', '14%', '16%', '20%'],
-                        body: tableBody,
-                    },
-                    layout: {
-                        fillColor: (rowIndex) => rowIndex === 0 ? '#ededed' : null,
-                        hLineWidth: () => 0.5,
-                        vLineWidth: () => 0.5
-                    },
-                    margin: [0, 0, 0, 10],
-                    fontSize: 12
-                });
-
+                // Rincian pembayaran (opsional, di bawah layout utama)
                 if (paymentLogs.length) {
                     content.push({
                         text: 'Rincian Pembayaran',
                         bold: true,
-                        fontSize: 12,
-                        margin: [0, 8, 0, 4],
+                        fontSize: 10,
+                        margin: [0, 10, 0, 4],
                     });
 
                     const rincianBody = [];
@@ -1412,15 +1351,9 @@
                             .map(h => ({text: h, style: 'tableHeader'})),
                     );
 
-                    let totalDebet = 0;
-                    let totalKredit = 0;
-
                     paymentLogs.forEach((log, index) => {
                         const debet = Number(log.debet ?? 0);
                         const kredit = Number(log.kredit ?? 0);
-                        totalDebet += debet;
-                        totalKredit += kredit;
-
                         rincianBody.push([
                             {text: index + 1, alignment: 'center'},
                             {text: log.billnm ?? '-', alignment: 'left'},
@@ -1434,14 +1367,6 @@
                         ]);
                     });
 
-                    rincianBody.push([
-                        {colSpan: 4, text: 'Total Rincian', alignment: 'right', style: 'tableHeader'},
-                        {}, {}, {},
-                        {text: formatRupiah(totalDebet), alignment: 'right'},
-                        {text: formatRupiah(totalKredit), alignment: 'right'},
-                        {}, {}, {},
-                    ]);
-
                     content.push({
                         table: {
                             widths: ['3%', '16%', '14%', '12%', '10%', '10%', '12%', '10%', '13%'],
@@ -1453,12 +1378,17 @@
                             vLineWidth: () => 0.5
                         },
                         margin: [0, 0, 0, 10],
-                        fontSize: 9
+                        fontSize: 8
                     });
                 }
 
                 Swal.close();
-                generatePdf('KUITANSI', content, siswa.CODE02);
+                generatePdf(
+                    (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN UANG SEKOLAH'),
+                    content,
+                    siswa.CODE02,
+                    { titleUnderline: true, skipFooter: true }
+                );
             }
 
             document.getElementById('cetak-kuitansi').addEventListener('click', async function (e) {
