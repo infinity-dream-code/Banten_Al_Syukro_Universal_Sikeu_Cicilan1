@@ -15,6 +15,7 @@ use App\Models\sccttran;
 use App\Models\User;
 use App\Support\CacheHandler;
 use App\Support\FilterHandler;
+use App\Support\ImportedLunasTranSync;
 use App\Support\MetodeBayarHelper;
 use App\Support\TagihanPaymentReversal;
 use Auth;
@@ -64,6 +65,12 @@ class DataPenerimaanController extends Controller
 
     public function index()
     {
+        try {
+            ImportedLunasTranSync::syncMissing();
+        } catch (\Throwable $e) {
+            Log::warning('Sync sccttran import lunas gagal', ['message' => $e->getMessage()]);
+        }
+
         $data['title'] = $this->title;
         $data['mainTitle'] = $this->mainTitle;
         $data['columnsUrl'] = $this->columnsUrl();

@@ -6,6 +6,7 @@ use App\Imports\Keuangan\TagihanSiswa\ImportTagihanLunasExcel;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
+use App\Support\ImportedLunasTranSync;
 use App\Support\PeriodeHelper;
 use App\Support\SchoolScope;
 use Carbon\Carbon;
@@ -212,6 +213,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
 
         try {
             DB::beginTransaction();
+            DB::connection('DATA_MYSQL')->beginTransaction();
             $insertedCount = 0;
 
             foreach ($validRows as $item) {
@@ -219,6 +221,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                 SchoolScope::apply($siswa, 'scctcust', $this->sekolah);
                 $siswa = $siswa->first();
                 if (!$siswa) {
+                    DB::connection('DATA_MYSQL')->rollBack();
                     DB::rollBack();
                     return response()->json(['message' => "siswa dengan nis: {$item['nis']} tidak ditemukan!"], 422);
                 }
@@ -239,7 +242,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                 $urut = $tagihanSiswaTerbaru ? $tagihanSiswaTerbaru['FUrutan'] + 1 : 1;
                 $billCD = date('Y') . '/i' . date('m') . '-' . ($urut + 1);
 
-                scctbill::create([
+                $aa = DB::connection('DATA_MYSQL')->table('scctbill')->insertGetId([
                     'CUSTID' => $siswa->CUSTID,
                     'BILLAC' => $bta,
                     'BILLNM' => $item['billnm'] ?? $item['nama_tagihan'],
@@ -258,11 +261,17 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                     'BILLCD' => $billCD,
                     'INSTALLMENT' => 1,
                     'isINSTALLABLE' => (int) ($item['is_installable'] ?? 0),
-                ]);
+                ], 'AA');
+
+                $bill = scctbill::find($aa);
+                if ($bill) {
+                    ImportedLunasTranSync::writeForBill($bill);
+                }
                 $insertedCount++;
             }
 
             Cache::forget($this->cacheKey);
+            DB::connection('DATA_MYSQL')->commit();
             DB::commit();
 
             Log::info('Simpan tagihan lunas excel berhasil', [
@@ -274,6 +283,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                 'message' => "Data tagihan lunas disimpan! Berhasil dibuat untuk {$insertedCount} baris.",
             ], 200);
         } catch (\Throwable $e) {
+            DB::connection('DATA_MYSQL')->rollBack();
             DB::rollBack();
 
             Log::error('Simpan tagihan lunas excel gagal', [
