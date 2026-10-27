@@ -1,5 +1,5 @@
 @extends('layouts.export.kop_file')
-@section('title', 'Bukti Pembayaran Uang Sekolah')
+@section('title', 'Bukti Pembayaran')
 @section('hide_default_footer', true)
 @section('content')
     @php
@@ -33,7 +33,7 @@
     <table width="100%">
         <tr>
             <td colspan="4" align="center">
-                <h4 style="text-decoration: underline; margin: 8px 0;">BUKTI PEMBAYARAN UANG SEKOLAH</h4>
+                <h4 style="text-decoration: underline; margin: 8px 0;">BUKTI PEMBAYARAN</h4>
             </td>
         </tr>
     </table>
@@ -70,8 +70,15 @@
         @foreach($tagihans as $tagihan)
             @php
                 $nilai = (int) ($tagihan->NOMINAL_BAYAR ?? $tagihan->BILLPAID ?? $tagihan->BILLAM ?? 0);
-                $periode = PeriodeHelper::label($tagihan->BILLAC ?? $tagihan->BTA ?? '');
-                $desc = trim(($tagihan->BILLNM ?? '-') . ($periode !== '-' && $periode !== '' ? ' Bulan ' . $periode : ''));
+                $rawPeriode = trim((string) ($tagihan->BILLAC ?? $tagihan->BTA ?? ''));
+                $periode = PeriodeHelper::label($rawPeriode);
+                $isMonthly = (bool) preg_match('/^\d{6}$/', $rawPeriode)
+                    && isset(PeriodeHelper::BULAN_INDO[(int) substr($rawPeriode, 4, 2)]);
+                $nama = trim((string) ($tagihan->BILLNM ?? '-'));
+                $desc = $nama;
+                if ($isMonthly && $periode !== '' && $periode !== '-') {
+                    $desc = $nama . (stripos($nama, 'bulan') !== false ? ' ' : ' Bulan ') . $periode;
+                }
             @endphp
             <tr>
                 <td>{{ str_pad(preg_replace('/\D/', '', (string) ($tagihan->AA ?? $tagihan->BILLCD ?? '')), 8, '0', STR_PAD_LEFT) }}</td>

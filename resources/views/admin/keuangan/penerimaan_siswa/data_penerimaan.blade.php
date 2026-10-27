@@ -1384,7 +1384,7 @@
 
                 Swal.close();
                 generatePdf(
-                    (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN UANG SEKOLAH'),
+                    (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN'),
                     content,
                     siswa.CODE02,
                     { titleUnderline: true, skipFooter: true }

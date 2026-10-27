@@ -590,7 +590,7 @@
                     }
                     const data = await generateKuitansi(result);
                     const pdf = await generatePdf(
-                        (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN UANG SEKOLAH'),
+                        (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN'),
                         data.data,
                         data.unit ?? false,
                         { titleUnderline: true, skipFooter: true }

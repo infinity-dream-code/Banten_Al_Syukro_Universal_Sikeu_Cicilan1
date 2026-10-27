@@ -588,7 +588,7 @@
                     if (!data || !data.data) throw createError('Gagal membuat kuitansi', 422);
 
                     await generatePdf(
-                        (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN UANG SEKOLAH'),
+                        (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN'),
                         data.data,
                         data.unit || false,
                         { titleUnderline: true, skipFooter: true }

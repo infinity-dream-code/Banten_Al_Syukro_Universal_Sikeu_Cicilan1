@@ -7,14 +7,10 @@
 
         function formatPeriodeLabel(periode) {
             const raw = (periode == null ? '' : String(periode)).trim();
-            if (!raw) return '';
-            if (/^\d{6}$/.test(raw)) {
-                const month = parseInt(raw.substring(4, 6), 10);
-                if (month >= 1 && month <= 12) {
-                    return BULAN[month - 1] + ' ' + raw.substring(0, 4);
-                }
-            }
-            return raw;
+            if (!/^\d{6}$/.test(raw)) return '';
+            const month = parseInt(raw.substring(4, 6), 10);
+            if (month < 1 || month > 12) return '';
+            return BULAN[month - 1] + ' ' + raw.substring(0, 4);
         }
 
         function formatMoneyPlain(amount) {
@@ -79,7 +75,7 @@
         }
 
         /**
-         * Body kuitansi gaya Al Syukro (BUKTI PEMBAYARAN UANG SEKOLAH).
+         * Body kuitansi gaya Al Syukro (BUKTI PEMBAYARAN).
          * options: { siswa, tagihans, bank, biayaLayanan, nomor, tanggal, tandaTangan, userName, formatMetode }
          */
         window.buildKuitansiAlSyukroBody = function (options) {
@@ -271,6 +267,6 @@
             return [infoTable, detailTable, footerBlock];
         };
 
-        window.KUITANSI_ALSYUKRO_TITLE = 'BUKTI PEMBAYARAN UANG SEKOLAH';
+        window.KUITANSI_ALSYUKRO_TITLE = 'BUKTI PEMBAYARAN';
     })(window);
 </script>
