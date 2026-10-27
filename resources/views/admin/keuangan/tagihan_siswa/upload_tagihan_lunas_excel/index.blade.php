@@ -84,14 +84,6 @@
         @endif
     </ul>
 
-    @php
-        $bulanList = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
-    @endphp
-
     <div class="card">
         <div class="card-header header-elements">
             <div class="card-title">
@@ -111,77 +103,11 @@
         </div>
 
         <div class="card-body border-bottom upload-tagihan-toolbar py-4">
-            <form id="filterForm">
-                <div class="row g-4">
-                    <div class="col-md-6 col-xl-5">
-                        <label class="required form-label" for="tagihan">Jenis Tagihan</label>
-                        <select class="form-select" id="tagihan" name="tagihan" required
-                                data-control="select2" data-placeholder="Pilih jenis tagihan">
-                            @isset($tagihan)
-                                @foreach($tagihan as $item)
-                                    <option value="{{ $item->urut }}">{{ $item->tagihan }}</option>
-                                @endforeach
-                            @else
-                                <option value="">Data kosong</option>
-                            @endisset
-                        </select>
-                    </div>
-                    <div class="col-md-6 col-xl-7">
-                        <label class="required form-label" for="periode_tahun">Periode Tagihan</label>
-                        <div class="row g-2">
-                            <div class="col-sm-6">
-                                <select class="form-select" id="periode_tahun" name="periode_tahun"
-                                        required data-control="select2" data-placeholder="Pilih tahun">
-                                    @foreach(($periode_tahun_list ?? []) as $tahun)
-                                        <option value="{{ $tahun }}"
-                                            @selected(($periode_tahun_default ?? date('Y')) == $tahun)>
-                                            {{ $tahun }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-sm-6">
-                                <select class="form-select" id="periode_bulan" name="periode_bulan"
-                                        data-control="select2" data-placeholder="Pilih bulan" data-allow-clear="true">
-                                    <option value="">Tanpa bulan</option>
-                                    @foreach($bulanList as $bulan => $label)
-                                        <option value="{{ $bulan }}"
-                                            @selected(($periode_bulan_default ?? date('n')) == $bulan)>
-                                            {{ $label }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                        <div class="upload-tagihan-bta">
-                            <i class="ri-calendar-line"></i>
-                            <span>Kode BTA</span>
-                            <span class="badge bg-primary" id="periode_preview">-</span>
-                        </div>
-                        <div class="form-text">Kosongkan bulan untuk tagihan tanpa periode bulanan (PSB). Kode BTA jadi tahun saja, misalnya <strong>2026</strong>.</div>
-                    </div>
-                    <div class="col-md-6 col-xl-5">
-                        <label class="required form-label" for="tanggal_bayar">Tanggal Bayar</label>
-                        <input type="date" class="form-control" id="tanggal_bayar" name="tanggal_bayar"
-                               value="{{ date('Y-m-d') }}" required>
-                    </div>
-                    <div class="col-md-6 col-xl-7">
-                        <label class="required form-label" for="bank">Bank</label>
-                        <select class="form-select" id="bank" name="bank" required
-                                data-control="select2" data-placeholder="Pilih bank">
-                            @foreach(($bankList ?? []) as $code => $label)
-                                <option value="{{ $code }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-12">
-                        <div class="alert alert-warning mb-0">
-                            Tagihan yang disimpan dari menu ini langsung berstatus <strong>LUNAS</strong>
-                            (tidak perlu dibayar lagi lewat Manual Pembayaran).
-                        </div>
-                    </div>
-                </div>
-            </form>
+            <form id="filterForm"></form>
+            <div class="alert alert-warning mb-0">
+                Import Excel membuat tagihan baru dan langsung berstatus <strong>LUNAS</strong>
+                (NIS, nama tagihan, periode, nominal, tanggal bayar, dan bank diambil per baris dari file).
+            </div>
         </div>
 
         <div class="card-datatable table-responsive text-nowrap">
@@ -225,14 +151,15 @@
                         <ul class="list-group list-group-timeline mb-3">
                             <li class="list-group-item list-group-timeline-danger">File harus berformat <span class="fw-bold">XLS/XLSX</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
-                            <li class="list-group-item list-group-timeline-danger">Format sama dengan <span class="fw-bold">Import Data Siswa</span>, ditambah kolom <span class="fw-bold">NOMINAL</span>.</li>
-                            <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">NIS, Nama, Unit, Kelas, Kelompok, Angkatan, Nominal</span>.</li>
-                            <li class="list-group-item list-group-timeline-danger">Kolom opsional: <span class="fw-bold">Gender, Alamat, Ortu</span>. Satu file bisa dipakai di menu Data Siswa dan Buat Tagihan Excel.</li>
-                            <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
+                            <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">NIS, NAMA TAGIHAN, PERIODE, NOMINAL, TANGGAL BAYAR, BANK</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">PERIODE contoh: <span class="fw-bold">Juli 2026</span>. TANGGAL BAYAR format <span class="fw-bold">d/m/Y</span> (contoh 4/8/2026).</li>
+                            <li class="list-group-item list-group-timeline-danger">BANK: <span class="fw-bold">BCAS</span>, <span class="fw-bold">Cash</span>, <span class="fw-bold">Saldo</span>, atau <span class="fw-bold">Transfer</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">Nama tagihan harus ada di Master Tagihan (contoh: SPP).</li>
+                            <li class="list-group-item list-group-timeline-danger">Contoh file:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
-                                   href="{{asset('TEMPLATE MENU UPLOAD DATA SISWA.xlsx')}}?v=20260918-nominal"
+                                   href="{{asset('TEMPLATE Input Tagihan Lunas.xlsx')}}?v=20261027-lunas"
                                    download>
-                                    <i class="ri ri-file-excel-line me-2"></i>Contoh File
+                                    <i class="ri ri-file-excel-line me-2"></i>Template Input Tagihan Lunas
                                 </a>
                             </li>
                         </ul>
@@ -416,18 +343,6 @@
             return formData;
         }
 
-        function syncPeriodePreview() {
-            const tahun = $('#periode_tahun').val();
-            const bulanVal = $('#periode_bulan').val();
-            if (tahun && bulanVal) {
-                $('#periode_preview').text(`${tahun}${String(bulanVal).padStart(2, '0')}`);
-            } else if (tahun) {
-                $('#periode_preview').text(tahun);
-            } else {
-                $('#periode_preview').text('-');
-            }
-        }
-
         document.addEventListener("DOMContentLoaded", function () {
             FilePond.registerPlugin(
                 FilePondPluginFileValidateType,
@@ -489,8 +404,7 @@
                         method = 'POST';
                         formData = appendImportFileToFormData(formData);
                     } else if (formId === "formValidate") {
-                        let form = document.getElementById('filterForm');
-                        formData = new FormData(form);
+                        formData = new FormData();
                         loadingAlert('Menyimpan data tagihan lunas');
                         url = '{{route('admin.keuangan.tagihan-siswa.upload-tagihan-lunas-excel.validate-excel')}}';
                         method = 'POST';
@@ -573,9 +487,6 @@
                     }, 0);
                 });
             });
-
-            $('#periode_tahun, #periode_bulan').on('change', syncPeriodePreview);
-            syncPeriodePreview();
 
             document.querySelectorAll('.js-clear-import').forEach(function (button) {
                 button.addEventListener('click', function () {

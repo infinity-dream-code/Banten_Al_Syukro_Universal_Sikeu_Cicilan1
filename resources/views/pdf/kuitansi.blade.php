@@ -86,7 +86,18 @@
         <tr>
             <td width="55%" valign="top">
                 <em>{{ $total > 0 ? $terbilangPdf($total) . ' Rupiah' : 'Nol Rupiah' }}</em>
-                <br><br><br>
+                <br>
+                @php
+                    $ttdPath = public_path(config('app.ttd_kuitansi', 'ttd.jpeg'));
+                    $ttdMime = strtolower(pathinfo($ttdPath, PATHINFO_EXTENSION)) === 'png' ? 'image/png' : 'image/jpeg';
+                @endphp
+                @if(is_file($ttdPath))
+                    <img src="data:{{ $ttdMime }};base64,{{ base64_encode(file_get_contents($ttdPath)) }}"
+                         alt="ttd" style="max-height: 70px; margin: 8px 0;">
+                    <br>
+                @else
+                    <br><br><br>
+                @endif
                 <u>{{ auth()->user()->name ?? 'Admin Keuangan' }}</u>
             </td>
             <td width="45%" valign="top">

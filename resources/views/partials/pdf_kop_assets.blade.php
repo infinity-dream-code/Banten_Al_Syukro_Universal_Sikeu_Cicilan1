@@ -8,12 +8,18 @@
 
     $pdfEdunesiaPath = public_path(config('app.logo_great_edunesia', 'great-edunesia.png'));
     $pdfEdunesiaB64 = is_file($pdfEdunesiaPath) ? base64_encode(file_get_contents($pdfEdunesiaPath)) : '';
+
+    $pdfTtdPath = public_path(config('app.ttd_kuitansi', 'ttd.jpeg'));
+    $pdfTtdExt = strtolower(pathinfo($pdfTtdPath, PATHINFO_EXTENSION));
+    $pdfTtdMime = $pdfTtdExt === 'png' ? 'image/png' : 'image/jpeg';
+    $pdfTtdB64 = is_file($pdfTtdPath) ? base64_encode(file_get_contents($pdfTtdPath)) : '';
 @endphp
 <script>
     window.PDF_KOP_ASSETS = {
         schoolLogo: @json($pdfLogoB64 ? ('data:' . $pdfLogoMime . ';base64,' . $pdfLogoB64) : ''),
         dompetLogo: @json($pdfDompetB64 ? ('data:image/png;base64,' . $pdfDompetB64) : ''),
         edunesiaLogo: @json($pdfEdunesiaB64 ? ('data:image/png;base64,' . $pdfEdunesiaB64) : ''),
+        ttdLogo: @json($pdfTtdB64 ? ('data:' . $pdfTtdMime . ';base64,' . $pdfTtdB64) : ''),
         namaInstansi: @json((string) config('app.nama_instansi')),
         namaSub1: @json((string) config('app.nama_sub_instansi_1')),
         namaSub2: @json((string) config('app.nama_sub_instansi_2')),

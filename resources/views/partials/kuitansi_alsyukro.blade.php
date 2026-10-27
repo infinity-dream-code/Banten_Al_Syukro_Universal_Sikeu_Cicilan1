@@ -197,7 +197,9 @@
             };
 
             const grandTotal = totalNilai + biayaLayanan;
-            const tandaTangan = options.tandaTangan || null;
+            const tandaTangan = options.tandaTangan
+                || (window.PDF_KOP_ASSETS && window.PDF_KOP_ASSETS.ttdLogo)
+                || null;
             const userName = options.userName || 'Admin Keuangan';
 
             const footerBlock = {

@@ -40,4 +40,44 @@ class PeriodeHelper
 
         return $raw;
     }
+
+    /**
+     * Parse label Excel ("Juli 2026", "202607", "2026") menjadi kode BILLAC.
+     */
+    public static function fromLabel(mixed $periode): ?string
+    {
+        $raw = trim((string) ($periode ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{6}$/', $raw)) {
+            $bulan = (int) substr($raw, 4, 2);
+            return ($bulan >= 1 && $bulan <= 12) ? $raw : null;
+        }
+
+        if (preg_match('/^\d{4}$/', $raw)) {
+            return $raw;
+        }
+
+        if (preg_match('/^(\d{4})[\/\-](\d{1,2})$/', $raw, $m)) {
+            $bulan = (int) $m[2];
+            return ($bulan >= 1 && $bulan <= 12) ? sprintf('%04d%02d', (int) $m[1], $bulan) : null;
+        }
+
+        $normalized = preg_replace('/\s+/', ' ', strtolower($raw));
+        $bulanMap = [];
+        foreach (self::BULAN_INDO as $num => $nama) {
+            $bulanMap[strtolower($nama)] = $num;
+        }
+
+        if (preg_match('/^([a-z]+)\s+(\d{4})$/i', $normalized, $m)) {
+            $bulan = $bulanMap[$m[1]] ?? null;
+            if ($bulan) {
+                return sprintf('%04d%02d', (int) $m[2], $bulan);
+            }
+        }
+
+        return null;
+    }
 }
