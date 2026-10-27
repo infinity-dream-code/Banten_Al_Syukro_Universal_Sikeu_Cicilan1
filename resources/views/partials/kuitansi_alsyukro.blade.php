@@ -200,7 +200,7 @@
             const tandaTangan = options.tandaTangan
                 || (window.PDF_KOP_ASSETS && window.PDF_KOP_ASSETS.ttdLogo)
                 || null;
-            const userName = options.userName || 'Admin Keuangan';
+            const userName = @json(config('app.nama_ttd_kuitansi', 'Cut Tia Andani, S.Ak.'));
 
             const footerBlock = {
                 columns: [

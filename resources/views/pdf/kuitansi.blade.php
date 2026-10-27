@@ -98,7 +98,7 @@
                 @else
                     <br><br><br>
                 @endif
-                <u>{{ auth()->user()->name ?? 'Admin Keuangan' }}</u>
+                <u>{{ config('app.nama_ttd_kuitansi', 'Cut Tia Andani, S.Ak.') }}</u>
             </td>
             <td width="45%" valign="top">
                 <table width="100%">
