@@ -245,6 +245,10 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
         $key = strtolower(trim($bank));
         $key = preg_replace('/\s+/', ' ', $key);
 
+        if ($key === '') {
+            return '1140001';
+        }
+
         return self::BANK_ALIASES[$key] ?? null;
     }
 

@@ -153,7 +153,7 @@
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">NIS, NAMA TAGIHAN, PERIODE, NOMINAL, TANGGAL BAYAR, BANK</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">PERIODE contoh: <span class="fw-bold">Juli 2026</span>. TANGGAL BAYAR format <span class="fw-bold">d/m/Y</span> (contoh 4/8/2026).</li>
-                            <li class="list-group-item list-group-timeline-danger">BANK: <span class="fw-bold">BCAS</span>, <span class="fw-bold">Cash</span>, <span class="fw-bold">Saldo</span>, atau <span class="fw-bold">Transfer</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">BANK: isi <span class="fw-bold">BCAS</span>. Import lunas dicatat sebagai Manual BCAS (TRANSNO format BCAS26/...). Kolom kosong juga dianggap BCAS.</li>
                             <li class="list-group-item list-group-timeline-danger">Nama tagihan harus ada di Master Tagihan (contoh: SPP).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"

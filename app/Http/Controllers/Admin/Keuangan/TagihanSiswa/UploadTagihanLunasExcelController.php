@@ -252,7 +252,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                     'PAIDST' => 1,
                     'PAIDDT' => $tanggalBayar,
                     'PAIDDT_ACTUAL' => now(),
-                    'FIDBANK' => $item['fidbank'],
+                    'FIDBANK' => '1140001',
                     'NOREFF' => 'TELLER',
                     'FUrutan' => $urut,
                     'FTGLTagihan' => now(),

@@ -33,14 +33,15 @@ class ImportedLunasTranSync
             return;
         }
 
-        $transno = $transno ?: self::nextTransno();
+        $transno = $transno ?: self::nextTransno($bill->PAIDDT);
+
         $payload = [
             'CUSTID' => $bill->CUSTID,
             'METODE' => 'FROM TELLER',
             'TRXDATE' => $bill->PAIDDT ?: now(),
             'NOREFF' => 'TELLER',
-            // 1140000 = Manual Cash: tidak dihitung sebagai debet saldo VA
-            'FIDBANK' => '1140000',
+            // Import lunas dicatat sebagai Manual BCAS, tidak masuk debet saldo VA
+            'FIDBANK' => '1140001',
             'DEBET' => $nominal,
             'KREDIT' => 0,
             'BILLID' => $bill->AA,
@@ -99,37 +100,39 @@ class ImportedLunasTranSync
             ->where(function ($q) {
                 $q->whereNull('FIDBANK')
                     ->orWhere('FIDBANK', '')
-                    ->orWhereNotIn('FIDBANK', ['1140000', '1140002']);
+                    ->orWhereNotIn('FIDBANK', ['1140000', '1140001', '1140002']);
             })
-            ->update(['FIDBANK' => '1140000']);
+            ->update(['FIDBANK' => '1140001']);
     }
 
-    private static function nextTransno(): string
+    /** Contoh: BCAS26/102000003 (tahun 2 digit / day-of-year 3 digit + urutan 6 digit). */
+    private static array $transnoSeq = [];
+
+    private static function nextTransno(mixed $paidAt = null): string
     {
         try {
-            $table = DB::table('ref_invoicedate');
-            $row = $table->where('idx_static', 1)->first();
-            if (!$row) {
-                $table->insert([
-                    'last_date' => date('Y-m-d'),
-                    'last_number' => 1,
-                    'idx_static' => 1,
-                ]);
-                $lastNumber = 1;
-            } else {
-                $lastNumber = (int) ($row->last_number ?? 0) + 1;
-                $update = ['last_number' => $lastNumber];
-                if (!Carbon::parse($row->last_date)->isSameDay(Carbon::now())) {
-                    $update['last_date'] = date('Y-m-d');
-                    $lastNumber = 1;
-                    $update['last_number'] = 1;
-                }
-                $table->where('idx_static', 1)->update($update);
-            }
-
-            return 'BMI' . date('ymd') . str_pad((string) $lastNumber, 6, '0', STR_PAD_LEFT);
+            $date = $paidAt ? Carbon::parse($paidAt) : Carbon::now();
         } catch (\Throwable $e) {
-            return 'BMI' . date('ymdHis') . substr((string) mt_rand(1000, 9999), 0, 4);
+            $date = Carbon::now();
         }
+
+        $prefix = 'BCAS' . $date->format('y') . '/' . str_pad((string) $date->dayOfYear, 3, '0', STR_PAD_LEFT);
+
+        if (!isset(self::$transnoSeq[$prefix])) {
+            $last = sccttran::query()
+                ->where('TRANSNO', 'like', $prefix . '%')
+                ->orderByDesc('TRANSNO')
+                ->value('TRANSNO');
+
+            $seq = 0;
+            if ($last && preg_match('/(\d{6})$/', (string) $last, $m)) {
+                $seq = (int) $m[1];
+            }
+            self::$transnoSeq[$prefix] = $seq;
+        }
+
+        self::$transnoSeq[$prefix]++;
+
+        return $prefix . str_pad((string) self::$transnoSeq[$prefix], 6, '0', STR_PAD_LEFT);
     }
 }
