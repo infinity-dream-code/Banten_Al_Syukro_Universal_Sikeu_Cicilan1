@@ -218,12 +218,7 @@ class DataPenerimaanController extends Controller
                         $filters[] = ['scctbill.BILLAC', '<=', $val];
                         break;
                     case 'scctcust.DESC02':
-                        $val = explode("~~", $val);
-                        if (count($val) == 3) {
-                            $filters[] = ['scctcust.CODE02', '=', $val[0]];
-                            $filters[] = ['scctcust.DESC02', '=', $val[1]];
-                            $filters[] = ['scctcust.DESC03', '=', $val[2]];
-                        }
+                        $filters[] = ['_kelas_multi', '=', $val];
                         break;
                     case 'scctbill.BILLNM':
                         if (is_array($val)) {
@@ -268,6 +263,10 @@ class DataPenerimaanController extends Controller
             if (!empty($filters)) {
                 $filterQuery = function ($query) use ($filters) {
                     foreach ($filters as $filter) {
+                        if (($filter[0] ?? null) === '_kelas_multi') {
+                            \App\Support\KelasFilter::apply($query, $filter[2] ?? []);
+                            continue;
+                        }
                         if (count($filter) === 3) {
                             if (($filter[1] ?? null) === 'in' && is_array($filter[2] ?? null)) {
                                 $query->whereIn($filter[0], $filter[2]);
@@ -592,7 +591,8 @@ class DataPenerimaanController extends Controller
             ->where(function ($q) {
                 $q->whereRaw('CAST(COALESCE(sccttran.DEBET, 0) AS SIGNED) > 0')
                     ->orWhereRaw('CAST(COALESCE(sccttran.KREDIT, 0) AS SIGNED) > 0');
-            });
+            })
+            ->whereRaw("UPPER(TRIM(COALESCE(sccttran.METODE, ''))) NOT IN ('REVERSAL', 'JURNAL SALDO')");
     }
 
     private function resolveOrderColumn(string $column): string
@@ -924,7 +924,7 @@ class DataPenerimaanController extends Controller
                     && preg_match('/^\d{2}-\d{2}-\d{4}$/', $request->filter['sampai_tanggal'])
                 ) {
                     foreach ($filter as $key => $val) {
-                        if (strtolower($val) != 'all' && $val !== null && $val !== '') {
+                        if (is_array($val) || (strtolower((string) $val) != 'all' && $val !== null && $val !== '')) {
                             $colName = match ($key) {
                                 'dari_tanggal', 'sampai_tanggal' => 'scctbill.PAIDDT',
                                 'tahun_akademik' => 'scctbill.BTA',
@@ -954,12 +954,7 @@ class DataPenerimaanController extends Controller
                             } elseif (in_array($key, ['nama', 'nis'])) {
                                 ($colName) && $filters[] = [$colName, 'like', '%' . $val . '%'];
                             } elseif ($key === 'kelas') {
-                                $parts = explode('~~', (string) $val);
-                                if (count($parts) === 3) {
-                                    $filters[] = ['scctcust.CODE02', '=', $parts[0]];
-                                    $filters[] = ['scctcust.DESC02', '=', $parts[1]];
-                                    $filters[] = ['scctcust.DESC03', '=', $parts[2]];
-                                }
+                                $filters[] = ['_kelas_multi', '=', $val];
                             } else {
                                 ($colName) && $filters[] = [$colName, '=', $val];
                             }
@@ -969,6 +964,10 @@ class DataPenerimaanController extends Controller
                     if (!empty($filters)) {
                         $filterQuery = function ($query) use ($filters) {
                             foreach ($filters as $filter) {
+                                if (($filter[0] ?? null) === '_kelas_multi') {
+                                    \App\Support\KelasFilter::apply($query, $filter[2] ?? []);
+                                    continue;
+                                }
                                 if (count($filter) === 3) {
                                     $query->where($filter[0], $filter[1], $filter[2]);
                                 } elseif (count($filter) === 4) {
@@ -1114,13 +1113,8 @@ class DataPenerimaanController extends Controller
                 ->when(!blank($filter['sekolah'] ?? null) && strtolower((string)$filter['sekolah']) !== 'all', function ($q) use ($filter) {
                     $q->where('d.CODE01', trim((string)$filter['sekolah']));
                 })
-                ->when(!blank($filter['kelas'] ?? null) && strtolower((string)$filter['kelas']) !== 'all', function ($q) use ($filter) {
-                    $parts = explode('~~', trim((string)$filter['kelas']));
-                    if (count($parts) === 3) {
-                        $q->where('d.CODE02', $parts[0])
-                            ->where('d.DESC02', $parts[1])
-                            ->where('d.DESC03', $parts[2]);
-                    }
+                ->when(!blank($filter['kelas'] ?? null), function ($q) use ($filter) {
+                    \App\Support\KelasFilter::apply($q, $filter['kelas'], 'd');
                 })
                 ->when(!blank($filter['periode_mulai'] ?? null) && preg_match('/^\d{6}$/', (string)$filter['periode_mulai']), function ($q) use ($filter) {
                     $q->where('b.BILLAC', '>=', (string)$filter['periode_mulai']);

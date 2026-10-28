@@ -30,16 +30,16 @@ class SaldoVirtualAccountController extends Controller
     private string $showTitle = 'Detail Saldo  Virtual Account';
     private string $cacheKey = 'saldo_virtual_account';
 
-    /** Pembayaran manual cash — tidak masuk saldo/jurnal VA. */
-    private const FIDBANK_MANUAL_CASH = '1140000';
+    /** Pembayaran teller/cash/bank — tidak masuk saldo/jurnal VA. */
+    private const FIDBANK_NOT_SALDO = ['1140000', '1140001', '1140003', '1140004', '1140005', '1200001', '1200002'];
 
-    /** List saldo: semua jurnal VA kecuali pembayaran Manual Cash (1140000). */
+    /** List saldo: jurnal VA saja (kecuali cash/BCAS/transfer teller). */
     private function excludeManualCashScope($query, string $fidBankColumn = 'FIDBANK')
     {
         return $query->where(function ($q) use ($fidBankColumn) {
             $q->whereNull($fidBankColumn)
                 ->orWhere($fidBankColumn, '')
-                ->orWhere($fidBankColumn, '<>', self::FIDBANK_MANUAL_CASH);
+                ->orWhereNotIn($fidBankColumn, self::FIDBANK_NOT_SALDO);
         });
     }
 
@@ -648,7 +648,7 @@ class SaldoVirtualAccountController extends Controller
             return 0;
         }
 
-        return (int) sccttran::query()
+        return (int) $this->excludeManualCashScope(sccttran::query())
             ->where('CUSTID', $custId)
             ->selectRaw('COALESCE(SUM(KREDIT), 0) - COALESCE(SUM(DEBET), 0) AS saldo')
             ->value('saldo');

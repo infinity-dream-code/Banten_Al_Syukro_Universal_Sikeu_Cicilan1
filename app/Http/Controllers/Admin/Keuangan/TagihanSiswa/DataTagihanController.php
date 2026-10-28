@@ -1111,15 +1111,7 @@ class DataTagihanController extends Controller
                     $filters[] = ['scctbill.BILLAC', '=', trim((string) $val)];
                     break;
                 case 'scctcust.DESC02':
-                    $delimiter = str_contains((string) $val, '~~') ? '~~' : '~~';
-                    $parts = explode($delimiter, (string) $val);
-                    if (count($parts) == 3) {
-                        if (!$this->sekolah) {
-                            $filters[] = ['scctcust.CODE02', '=', $parts[0]];
-                        }
-                        $filters[] = ['scctcust.DESC02', '=', $parts[1]];
-                        $filters[] = ['scctcust.DESC03', '=', $parts[2]];
-                    }
+                    $filters[] = ['_kelas_multi', '=', $val];
                     break;
                 case 'scctcust.CODE02':
                 case 'scctcust.CODE01':
@@ -1143,6 +1135,10 @@ class DataTagihanController extends Controller
 
         return function ($query) use ($filters) {
             foreach ($filters as $filter) {
+                if (($filter[0] ?? null) === '_kelas_multi') {
+                    \App\Support\KelasFilter::apply($query, $filter[2] ?? []);
+                    continue;
+                }
                 if (($filter[0] ?? null) === 'whereRaw') {
                     $query->whereRaw($filter[1], $filter[2] ?? []);
                     continue;

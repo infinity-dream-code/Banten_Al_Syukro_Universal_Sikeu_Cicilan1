@@ -207,7 +207,7 @@
                                     @isset($kelas)
                                         @foreach($kelas as $item)
                                             <option
-                                                value="{{$item->kelompok ?? $item->unit}}~{{$item->jenjang}}~{{$item->id ?? $item->kelas}}"
+                                                value="{{$item->unit}}~~{{$item->jenjang}}~~{{$item->kelas}}"
                                                 data-group="{{$item->kelompok ?? $item->unit}}">
                                                 {{$item->unit}} - {{$item->jenjang}} {{$item->kelas}}
                                             </option>
@@ -393,7 +393,7 @@
             }
 
             $("[name='filter[unit]']").on('change', function () {
-                const $kelasSelect = $("[name='filter[kelas]']");
+                const $kelasSelect = $("[name='filter[kelas][]'], [name='filter[kelas]']");
                 const selectedGroupRaw = $(this).find(':selected').data('group');
                 const selectedGroup = String(selectedGroupRaw ?? '').trim().toUpperCase();
                 const currentKelas = $kelasSelect.val() || [];

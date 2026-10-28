@@ -261,9 +261,9 @@
                                     Kelas
                                 </label>
                                 <div class="col">
-                                    <select class="form-select" id="filter[kelas]" name="filter[kelas]"
+                                    <select class="form-select" id="filter[kelas]" name="filter[kelas][]"
+                                            multiple
                                             data-control="select2" data-placeholder="Pilih Kelas">
-                                        <option value="all">Semua</option>
                                         @isset($kelas)
                                             @foreach($kelas as $item)
                                                 <option

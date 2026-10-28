@@ -106,7 +106,8 @@ class RekapPenerimaanController extends Controller
                     ->orWhere('sccttran.isreversal', 0)
                     ->orWhere('sccttran.isreversal', '0');
             })
-            ->whereRaw("UPPER(TRIM(COALESCE(sccttran.METODE, ''))) <> 'TOP UP'");
+            ->whereRaw("UPPER(TRIM(COALESCE(sccttran.METODE, ''))) <> 'TOP UP'")
+            ->whereRaw("UPPER(TRIM(COALESCE(sccttran.METODE, ''))) NOT IN ('REVERSAL', 'JURNAL SALDO')");
     }
 
     private function resolveMetodeLabel(object $item, array $metodeBayarMap): string
@@ -389,19 +390,8 @@ class RekapPenerimaanController extends Controller
                             }
                         } else if ($key == 'kelas') {
                             $kelasValues = is_array($val) ? $val : [$val];
-                            $kelasPairs = [];
-                            foreach ($kelasValues as $kelasValue) {
-                                $kelasPart = explode("~", (string) $kelasValue);
-                                if (count($kelasPart) == 3) {
-                                    $kelasPairs[] = [
-                                        'CODE01' => $kelasPart[0],
-                                        'DESC02' => $kelasPart[1],
-                                        'CODE03' => $kelasPart[2],
-                                    ];
-                                }
-                            }
-                            if (!empty($kelasPairs)) {
-                                $filters[] = ['_kelas_multi', '=', $kelasPairs];
+                            if (\App\Support\KelasFilter::parse($kelasValues) !== []) {
+                                $filters[] = ['_kelas_multi', '=', $kelasValues];
                             }
                         } else if ($key == 'post') {
                             $array = array_filter($val, function ($value) {
@@ -450,24 +440,13 @@ class RekapPenerimaanController extends Controller
                                 $value = $filter[2] ?? null;
                                 if (!blank($value)) {
                                     $query->where(function ($q) use ($value) {
-                                        $q->whereRaw('TRIM(CAST(scctcust.CODE02 AS CHAR)) = ?', [trim((string) $value)]);
+                                        $q->whereRaw('TRIM(CAST(scctcust.CODE01 AS CHAR)) = ?', [trim((string) $value)]);
                                     });
                                 }
                                 continue;
                             }
                             if (($filter[0] ?? null) === '_kelas_multi') {
-                                $kelasPairs = $filter[2] ?? [];
-                                if (!empty($kelasPairs)) {
-                                    $query->where(function ($q) use ($kelasPairs) {
-                                        foreach ($kelasPairs as $kelasPair) {
-                                            $q->orWhere(function ($kelasQuery) use ($kelasPair) {
-                                                $kelasQuery->where('scctcust.CODE02', '=', $kelasPair['CODE01'])
-                                                    ->where('scctcust.DESC02', '=', $kelasPair['DESC02'])
-                                                    ->where('scctcust.CODE03', '=', $kelasPair['CODE03']);
-                                            });
-                                        }
-                                    });
-                                }
+                                \App\Support\KelasFilter::apply($query, $filter[2] ?? []);
                                 continue;
                             }
                             if (($filter[0] ?? null) === '_android_bill') {
@@ -656,19 +635,8 @@ class RekapPenerimaanController extends Controller
                     } else if ($key == 'kelas') {
                         $kelasValues = is_array($val) ? $val : [$val];
                         $kelas = $kelasValues;
-                        $kelasPairs = [];
-                        foreach ($kelasValues as $kelasValue) {
-                            $kelasPart = explode("~", (string) $kelasValue);
-                            if (count($kelasPart) == 3) {
-                                $kelasPairs[] = [
-                                    'CODE01' => $kelasPart[0],
-                                    'DESC02' => $kelasPart[1],
-                                    'CODE03' => $kelasPart[2],
-                                ];
-                            }
-                        }
-                        if (!empty($kelasPairs)) {
-                            $filters[] = ['_kelas_multi', '=', $kelasPairs];
+                        if (\App\Support\KelasFilter::parse($kelasValues) !== []) {
+                            $filters[] = ['_kelas_multi', '=', $kelasValues];
                         }
                     } else if ($key == 'post') {
                         $array = array_filter($val, function ($value) {
@@ -737,7 +705,7 @@ class RekapPenerimaanController extends Controller
                             $value = $filter[2] ?? null;
                             if (!blank($value)) {
                                 $query->where(function ($q) use ($value) {
-                                    $q->whereRaw('TRIM(CAST(scctcust.CODE02 AS CHAR)) = ?', [trim((string) $value)]);
+                                    $q->whereRaw('TRIM(CAST(scctcust.CODE01 AS CHAR)) = ?', [trim((string) $value)]);
                                 });
                             }
                             continue;
@@ -767,18 +735,7 @@ class RekapPenerimaanController extends Controller
                 ->where(function ($query) use ($filter_main) {
                     foreach ($filter_main as $filter) {
                         if (($filter[0] ?? null) === '_kelas_multi') {
-                            $kelasPairs = $filter[2] ?? [];
-                            if (!empty($kelasPairs)) {
-                                $query->where(function ($q) use ($kelasPairs) {
-                                    foreach ($kelasPairs as $kelasPair) {
-                                        $q->orWhere(function ($kelasQuery) use ($kelasPair) {
-                                            $kelasQuery->where('scctcust.CODE02', '=', $kelasPair['CODE01'])
-                                                ->where('scctcust.DESC02', '=', $kelasPair['DESC02'])
-                                                ->where('scctcust.CODE03', '=', $kelasPair['CODE03']);
-                                        });
-                                    }
-                                });
-                            }
+                            \App\Support\KelasFilter::apply($query, $filter[2] ?? []);
                             continue;
                         }
                         switch (count($filter)) {

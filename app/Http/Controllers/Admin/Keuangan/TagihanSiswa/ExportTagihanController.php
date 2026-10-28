@@ -87,7 +87,7 @@ class ExportTagihanController extends Controller
         $filter = $request->input('filter');
         if ($filter) {
             foreach ($filter as $key => $val) {
-                if (strtolower($val) != 'all' && $val !== null && $val !== '') {
+                if (is_array($val) || (strtolower((string) $val) != 'all' && $val !== null && $val !== '')) {
                     $colName = match ($key) {
                         'tanggal-pembuatan' => 'scctbill.FTGLTagihan',
                         'tahun_akademik' => 'scctbill.BTA',
@@ -111,6 +111,8 @@ class ExportTagihanController extends Controller
                         $val = is_numeric($val) ? $val : '%' . $val . '%';
                         $colName = is_numeric($val) ? 'scctcust.nocust' : $colName;
                         ($colName) && $filters[] = [$colName, 'like', $val];
+                    } elseif ($key == 'kelas') {
+                        $filters[] = ['_kelas_multi', '=', $val];
                     } else {
                         ($colName) && $filters[] = [$colName, '=', $val];
                     }
@@ -120,6 +122,10 @@ class ExportTagihanController extends Controller
             if (!empty($filters)) {
                 $filterQuery = function ($query) use ($filters) {
                     foreach ($filters as $filter) {
+                        if (($filter[0] ?? null) === '_kelas_multi') {
+                            \App\Support\KelasFilter::apply($query, $filter[2] ?? []);
+                            continue;
+                        }
                         if (count($filter) === 3) {
                             $query->where($filter[0], $filter[1], $filter[2]);
                         } elseif (count($filter) === 4) {

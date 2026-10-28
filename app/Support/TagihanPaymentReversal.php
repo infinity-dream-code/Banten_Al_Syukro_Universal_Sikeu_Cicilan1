@@ -12,23 +12,31 @@ use Illuminate\Support\Str;
 
 class TagihanPaymentReversal
 {
-    /** Batalkan pembayaran terakhir: kosongkan KREDIT baris terakhir, lalu panggil procedure DB. */
+    private const SALDO_FIDBANK = '1140002';
+
+    /** Batalkan pembayaran terakhir. Cash/bank lain tidak boleh masuk saldo. */
     public function reverseLastPayment(scctbill $tagihan, Request $request): void
     {
         if (!$this->hasBillPayments($tagihan)) {
             return;
         }
 
-        $this->clearLastPaymentKredit($tagihan);
+        $fidBank = preg_replace('/\D/', '', (string) ($tagihan->FIDBANK ?? ''));
 
-        $this->callCancelPaymentSaldo(
-            (string) $tagihan->CUSTID,
-            (string) $tagihan->AA,
-            (string) ($tagihan->BILLCD ?? ''),
-            $this->resolveCyberKeyUserId(),
-            Str::limit((string) ($request->ip() ?? ''), 250, '')
-        );
+        if ($fidBank === self::SALDO_FIDBANK) {
+            $this->clearLastPaymentKredit($tagihan);
+            $this->callCancelPaymentSaldo(
+                (string) $tagihan->CUSTID,
+                (string) $tagihan->AA,
+                (string) ($tagihan->BILLCD ?? ''),
+                $this->resolveCyberKeyUserId(),
+                Str::limit((string) ($request->ip() ?? ''), 250, '')
+            );
+        } else {
+            $this->reverseTellerWithoutSaldo($tagihan);
+        }
 
+        $this->markPaymentReversed($tagihan);
         $tagihan->refresh();
     }
 
@@ -65,13 +73,34 @@ class TagihanPaymentReversal
         return $this->paymentTransactionQuery($tagihan)->exists();
     }
 
+    private function reverseTellerWithoutSaldo(scctbill $tagihan): void
+    {
+        $billAm = (int) ($tagihan->BILLAM ?? 0);
+
+        $this->clearLastPaymentKredit($tagihan);
+
+        $tagihan->update([
+            'PAIDST' => 0,
+            'PAIDDT' => null,
+            'PAIDDT_ACTUAL' => null,
+            'BILLPAID' => 0,
+            'PAYMENTLEFT' => $billAm,
+            'INSTALLMENT' => 0,
+        ]);
+    }
+
     private function paymentTransactionQuery(scctbill $tagihan)
     {
         return sccttran::query()
             ->where('BILLID', $tagihan->AA)
             ->where('CUSTID', $tagihan->CUSTID)
             ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
-            ->where('DEBET', '>', 0);
+            ->where('DEBET', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('isreversal')
+                    ->orWhere('isreversal', 0)
+                    ->orWhere('isreversal', '0');
+            });
     }
 
     private function clearLastPaymentKredit(scctbill $tagihan): void
@@ -89,6 +118,25 @@ class TagihanPaymentReversal
             ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
             ->where('KREDIT', '>', 0)
             ->update(['KREDIT' => 0]);
+    }
+
+    private function markPaymentReversed(scctbill $tagihan): void
+    {
+        try {
+            sccttran::query()
+                ->where('BILLID', $tagihan->AA)
+                ->where('CUSTID', $tagihan->CUSTID)
+                ->where(function ($q) {
+                    $q->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
+                        ->orWhereRaw('UPPER(TRIM(COALESCE(METODE, ""))) IN (?, ?)', ['REVERSAL', 'JURNAL SALDO']);
+                })
+                ->update(['isreversal' => 1]);
+        } catch (\Throwable $e) {
+            if (stripos($e->getMessage(), 'isreversal') === false
+                && stripos($e->getMessage(), 'Unknown column') === false) {
+                throw $e;
+            }
+        }
     }
 
     private function callCancelPaymentSaldo(string $custId, string $aa, string $billCd, string $userId, string $hostname): void

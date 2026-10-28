@@ -39,7 +39,8 @@ class ImportedLunasTranSync
             'METODE' => 'FROM TELLER',
             'TRXDATE' => $bill->PAIDDT ?: now(),
             'NOREFF' => 'TELLER',
-            'FIDBANK' => (string) ($bill->FIDBANK ?? ''),
+            // 1140000 = Manual Cash: tidak dihitung sebagai debet saldo VA
+            'FIDBANK' => '1140000',
             'DEBET' => $nominal,
             'KREDIT' => 0,
             'BILLID' => $bill->AA,
@@ -59,6 +60,8 @@ class ImportedLunasTranSync
     /** Tagihan lunas import (NOREFF=TELLER) yang belum punya sccttran. */
     public static function syncMissing(): int
     {
+        self::neutralizeImportedSaldoImpact();
+
         $bills = scctbill::query()
             ->whereIn('PAIDST', [1, '1'])
             ->whereRaw('UPPER(TRIM(COALESCE(NOREFF, ""))) = ?', ['TELLER'])
@@ -85,6 +88,20 @@ class ImportedLunasTranSync
         }
 
         return $count;
+    }
+
+    /** Import lunas historis tidak boleh mengurangi saldo VA. */
+    public static function neutralizeImportedSaldoImpact(): int
+    {
+        return sccttran::query()
+            ->whereRaw('UPPER(TRIM(COALESCE(NOREFF, ""))) = ?', ['TELLER'])
+            ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
+            ->where(function ($q) {
+                $q->whereNull('FIDBANK')
+                    ->orWhere('FIDBANK', '')
+                    ->orWhereNotIn('FIDBANK', ['1140000', '1140002']);
+            })
+            ->update(['FIDBANK' => '1140000']);
     }
 
     private static function nextTransno(): string

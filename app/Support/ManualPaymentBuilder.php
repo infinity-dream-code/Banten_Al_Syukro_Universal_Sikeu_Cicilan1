@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\scctbill;
+use App\Models\sccttran;
 use Auth;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -29,6 +30,7 @@ class ManualPaymentBuilder
 
         if ($fidBank === self::SALDO_FIDBANK) {
             $this->callBuilderPaymentBill($aa, $nominal);
+            $this->applySelectedPaymentDate($aa, $custId, $paidAt);
             return;
         }
 
@@ -41,6 +43,29 @@ class ManualPaymentBuilder
             $aa,
             $nominal
         );
+        $this->applySelectedPaymentDate($aa, $custId, $paidAt);
+    }
+
+    /** Stored procedure sering isi NOW(); paksa PAIDDT/TRXDATE ke tanggal yang dipilih kasir. */
+    private function applySelectedPaymentDate(string $aa, string $custId, string $paidAt): void
+    {
+        $paidAt = Carbon::parse($paidAt)->toDateTimeString();
+
+        scctbill::query()
+            ->where('AA', $aa)
+            ->where('CUSTID', $custId)
+            ->update(['PAIDDT' => $paidAt]);
+
+        $tran = sccttran::query()
+            ->where('BILLID', $aa)
+            ->where('CUSTID', $custId)
+            ->orderByDesc('urut')
+            ->first();
+
+        if ($tran) {
+            $tran->TRXDATE = $paidAt;
+            $tran->save();
+        }
     }
 
     /**

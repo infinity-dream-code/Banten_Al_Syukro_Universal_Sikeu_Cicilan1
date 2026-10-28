@@ -107,7 +107,7 @@ class HapusTagihanController extends Controller
         $filter = $request->input('filter');
         if ($filter) {
             foreach ($filter as $key => $val) {
-                if (strtolower($val) != 'all' && $val !== null && $val !== '') {
+                if (is_array($val) || (strtolower((string) $val) != 'all' && $val !== null && $val !== '')) {
                     $colName = match ($key) {
                         'tanggal-pembuatan' => 'scctbill.FTGLTagihan',
                         'periode' => 'scctbill.BILLAC',
@@ -131,12 +131,7 @@ class HapusTagihanController extends Controller
                         $colName = is_numeric($val) ? 'scctcust.nocust' : $colName;
                         ($colName) && $filters[] = [$colName, 'like', $val];
                     } elseif ($key == 'kelas') {
-                        $parts = explode('~~', (string) $val);
-                        if (count($parts) === 3) {
-                            $filters[] = ['scctcust.CODE02', '=', $parts[0]];
-                            $filters[] = ['scctcust.DESC02', '=', $parts[1]];
-                            $filters[] = ['scctcust.DESC03', '=', $parts[2]];
-                        }
+                        $filters[] = ['_kelas_multi', '=', $val];
                     } elseif ($key == 'angkatan') {
                         $filters[] = ['scctcust.DESC04', '=', $val];
                     } else {
@@ -148,6 +143,10 @@ class HapusTagihanController extends Controller
             if (!empty($filters)) {
                 $filterQuery = function ($query) use ($filters) {
                     foreach ($filters as $filter) {
+                        if (($filter[0] ?? null) === '_kelas_multi') {
+                            \App\Support\KelasFilter::apply($query, $filter[2] ?? []);
+                            continue;
+                        }
                         if (count($filter) === 3) {
                             $query->where($filter[0], $filter[1], $filter[2]);
                         } elseif (count($filter) === 4) {

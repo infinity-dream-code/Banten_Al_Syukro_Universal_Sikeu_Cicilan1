@@ -123,14 +123,14 @@
                                 <label class="form-label" for="filter[kelas]">
                                     Kelas
                                 </label>
-                                <select class="form-select" id="filter[kelas]" name="filter[kelas]"
+                                <select class="form-select" id="filter[kelas]" name="filter[kelas][]"
+                                        multiple
                                         data-control="select2" data-placeholder="Pilih Kelas">
-                                    <option value="all">Semua</option>
                                     @isset($kelas)
                                         @foreach($kelas as $item)
                                             <option
-                                                value="{{$item->jenjang}}">{{$item->unit}}
-                                                - {{$item->kelas}} {{$item->jenjang}}</option>
+                                                value="{{$item->unit}}~~{{$item->jenjang}}~~{{$item->kelas}}">{{$item->unit}}
+                                                - {{$item->jenjang}} {{$item->kelas}}</option>
                                         @endforeach
                                     @else
                                         <option>data kosong</option>
