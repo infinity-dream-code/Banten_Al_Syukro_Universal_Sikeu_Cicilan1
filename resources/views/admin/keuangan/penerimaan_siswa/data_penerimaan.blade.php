@@ -509,6 +509,14 @@
         });
 
         document.querySelector('#main_table tbody').addEventListener('click', function (e) {
+            if (e.target.closest('.btn-kuitansi')) {
+                const rowEl = e.target.closest('tr');
+                if (rowEl && typeof window.generateKuitansiAsync === 'function') {
+                    const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
+                    window.generateKuitansiAsync(false, rowData ? [rowData] : []);
+                }
+                return;
+            }
             if (e.target.closest('.btn-reversal')) {
                 const rowEl = e.target.closest('tr');
 
@@ -1253,8 +1261,10 @@
                 return generateKuitansiAsync(biayaLayanan);
             }
 
-            async function generateKuitansiAsync(biayaLayanan = false) {
-                let data = DT[`${dtOptions.tableId}`].rows({selected: true}).data().toArray();
+            async function generateKuitansiAsync(biayaLayanan = false, rows = null) {
+                let data = Array.isArray(rows)
+                    ? rows
+                    : DT[`${dtOptions.tableId}`].rows({selected: true}).data().toArray();
                 data = data.filter(item => {
                     const tanggal = item.PAIDDT ?? item.TRXDATE;
                     const nominal = Number(item.BILLAM ?? item.DEBET ?? 0);
@@ -1262,7 +1272,9 @@
                 });
 
                 if (!data[0]) {
-                    warningAlert('Silahkan pilih data pembayaran yang belum di-reversal!');
+                    warningAlert(rows
+                        ? 'Kuitansi hanya untuk tagihan yang sudah dibayar atau pernah dicicil.'
+                        : 'Silahkan pilih data pembayaran yang belum di-reversal!');
                     return;
                 }
 
@@ -1275,32 +1287,6 @@
                 }
 
                 loadingAlert('Membuat kuitansi...');
-
-                const billsPayload = data.map(item => ({
-                    aa: item.item_id ?? item.AA,
-                    custid: item.CUSTID,
-                    billnm: item.BILLNM,
-                    bill_transno: item.TRANSNO ?? item.BILL_TRANSNO ?? '',
-                }));
-
-                let paymentLogs = [];
-                try {
-                    const response = await fetch('{{ route('admin.keuangan.penerimaan-siswa.data-penerimaan.get-trans-logs-bulk') }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
-                        },
-                        body: JSON.stringify({bills: billsPayload}),
-                    });
-                    const result = await response.json().catch(() => ({}));
-                    if (response.ok) {
-                        paymentLogs = Array.isArray(result.logs) ? result.logs : [];
-                    }
-                } catch (e) {
-                    console.error('Gagal ambil rincian pembayaran:', e);
-                }
 
                 let siswa = data[0];
                 const tagihans = data.map(item => ({
@@ -1336,52 +1322,6 @@
                     })
                     : [];
 
-                // Rincian pembayaran (opsional, di bawah layout utama)
-                if (paymentLogs.length) {
-                    content.push({
-                        text: 'Rincian Pembayaran',
-                        bold: true,
-                        fontSize: 10,
-                        margin: [0, 10, 0, 4],
-                    });
-
-                    const rincianBody = [];
-                    rincianBody.push(
-                        ['#', 'Nama Tagihan', 'Tanggal', 'Metode', 'Debet', 'Kredit', 'Bank', 'No Ref', 'Trans No']
-                            .map(h => ({text: h, style: 'tableHeader'})),
-                    );
-
-                    paymentLogs.forEach((log, index) => {
-                        const debet = Number(log.debet ?? 0);
-                        const kredit = Number(log.kredit ?? 0);
-                        rincianBody.push([
-                            {text: index + 1, alignment: 'center'},
-                            {text: log.billnm ?? '-', alignment: 'left'},
-                            {text: log.trxdate ?? '-', alignment: 'left'},
-                            {text: log.metode ?? '-', alignment: 'left'},
-                            {text: debet > 0 ? formatRupiah(debet) : '-', alignment: 'right'},
-                            {text: kredit > 0 ? formatRupiah(kredit) : '-', alignment: 'right'},
-                            {text: formatMetodePembayaran(log.fidbank ?? '', log.noreff ?? ''), alignment: 'left'},
-                            {text: log.noreff ?? '-', alignment: 'left'},
-                            {text: log.transno ?? '-', alignment: 'left'},
-                        ]);
-                    });
-
-                    content.push({
-                        table: {
-                            widths: ['3%', '16%', '14%', '12%', '10%', '10%', '12%', '10%', '13%'],
-                            body: rincianBody,
-                        },
-                        layout: {
-                            fillColor: (rowIndex) => rowIndex === 0 ? '#ededed' : null,
-                            hLineWidth: () => 0.5,
-                            vLineWidth: () => 0.5
-                        },
-                        margin: [0, 0, 0, 10],
-                        fontSize: 8
-                    });
-                }
-
                 Swal.close();
                 generatePdf(
                     (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN'),
@@ -1390,6 +1330,8 @@
                     { titleUnderline: true, skipFooter: true }
                 );
             }
+
+            window.generateKuitansiAsync = generateKuitansiAsync;
 
             document.getElementById('cetak-kuitansi').addEventListener('click', async function (e) {
                 e.preventDefault();

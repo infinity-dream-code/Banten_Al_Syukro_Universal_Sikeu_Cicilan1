@@ -230,6 +230,10 @@
                                 <span class="ri-info-card-line me-2"></span>
                                 Cetak Kartu Siswa
                             </button>
+                            <button type="button" class="btn btn-success" id="cetak-kuitansi">
+                                <span class="ri-printer-line me-2"></span>
+                                Cetak Kuitansi
+                            </button>
                             <button type="button" class="btn btn-google-plus btn-print-rekap">
                                 <span class="ri-file-pdf-2-line me-2"></span>
                                 Cetak Rekap
@@ -518,6 +522,7 @@
             integrity="sha512-EFlschXPq/G5zunGPRSYqazR1CMKj0cQc8v6eMrQwybxgIbhsfoO5NAMQX3xFDQIbFlViv53o7Hy+yCWw6iZxA=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     @include('partials.pdf_kop_assets')
+    @include('partials.kuitansi_alsyukro')
 
     <script type="text/javascript">
         const select2 = $(`[data-control='select2']`);
@@ -829,6 +834,14 @@
         }
 
         document.querySelector('#main_table tbody').addEventListener('click', function (e) {
+            if (e.target.closest('.btn-kuitansi')) {
+                const rowEl = e.target.closest('tr');
+                if (rowEl && typeof window.generateKuitansiFromRows === 'function') {
+                    const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
+                    window.generateKuitansiFromRows(rowData ? [rowData] : []);
+                }
+                return;
+            }
             if (e.target.closest('.btn-reversal')) {
                 const rowEl = e.target.closest('tr');
                 if (rowEl) {
@@ -1308,7 +1321,7 @@
                     return APP_VA_PREFIX + digits.padStart(padLen, '0');
                 })();
 
-            async function generatePdf(title, bodyContent, unit_logo = false) {
+            async function generatePdf(title, bodyContent, unit_logo = false, options = {}) {
                 try {
                     let logo = 'data:{{ config('app.logo_mime') }};base64,' + headerLogo;
 
@@ -1385,10 +1398,19 @@
                                 }
                             ]
                         },
-                        {text: title.toUpperCase(), style: 'title', margin: [0, 5, 0, 5]},
-                        ...bodyContent,
-                        footer
                     ];
+                    if (title) {
+                        content.push({
+                            text: String(title || '').toUpperCase(),
+                            style: 'title',
+                            decoration: options.titleUnderline ? 'underline' : undefined,
+                            margin: [0, 5, 0, 5],
+                        });
+                    }
+                    content.push(...(bodyContent || []));
+                    if (!options.skipFooter) {
+                        content.push(footer);
+                    }
 
                     // PDF definition
                     const docDefinition = {
@@ -1421,6 +1443,110 @@
                     errorAlert(e.message);
                 }
             }
+
+            function formatMetodePembayaran(data, noreff) {
+                if (String(noreff || '').trim().toLowerCase() === 'mobile') {
+                    return 'ANDROID';
+                }
+                const descriptions = {
+                    '1140000': 'Manual Cash',
+                    '1140001': 'Manual BCAS',
+                    '1140002': 'Manual SALDO',
+                    '1140003': 'Transfer Bank Lain',
+                    '1140004': 'INFAQ',
+                    '1140005': 'Transfer Bank BRI',
+                    '1200001': 'Loket Manual - Beasiswa',
+                    '1200002': 'Loket Manual - Potongan',
+                    '1': 'H2H VA BMI - ATM',
+                    '2': 'H2H VA BMI - Teller',
+                    '3': 'H2H VA BMI - IBANK',
+                    '4': 'H2H VA BMI - EDC',
+                    '5': 'H2H VA BMI - MOBILE',
+                    '6': 'ANDROID',
+                    null: 'Nomor VA',
+                    '': 'Nomor VA'
+                };
+                return descriptions[data] || data;
+            }
+
+            function paidAmountOf(item) {
+                return Number(item?.BILLPAID ?? item?.billpaid ?? 0);
+            }
+
+            async function generateKuitansiFromRows(rows) {
+                const data = (rows || []).filter(item => paidAmountOf(item) > 0);
+                if (!data[0]) {
+                    warningAlert('Kuitansi hanya untuk tagihan yang sudah lunas atau pernah dicicil.');
+                    return;
+                }
+
+                const firstNis = data[0]?.NOCUST ?? data[0]?.nocust;
+                const firstCust = data[0]?.CUSTID ?? data[0]?.custid;
+                const allSame = data.every(row =>
+                    (row.NOCUST ?? row.nocust) === firstNis && (row.CUSTID ?? row.custid) === firstCust
+                );
+                if (!allSame) {
+                    warningAlert('Silahkan pilih tagihan siswa yang sama!');
+                    return;
+                }
+
+                loadingAlert('Membuat kuitansi...');
+
+                const siswa = data[0];
+                const tagihans = data.map(item => ({
+                    AA: item.item_id ?? item.AA,
+                    BILLCD: item.BILLCD,
+                    BILLNM: item.BILLNM,
+                    BILLAC: item.BILLAC_CODE || item.BILLAC,
+                    BTA: item.BTA,
+                    NOMINAL_BAYAR: paidAmountOf(item),
+                    BILLAM: Number(item.BILLAM_TOTAL ?? item.BILLAM ?? 0),
+                    BILLPAID: paidAmountOf(item),
+                    PAIDDT: item.PAIDDT ?? item.PAIDDT_ISO,
+                    FIDBANK: item.FIDBANK,
+                    NOREFF: item.BILL_NOREFF ?? item.NOREFF,
+                    TRANSNO: item.TRANSNO ?? item.BILL_TRANSNO,
+                }));
+
+                const content = (typeof buildKuitansiAlSyukroBody === 'function')
+                    ? buildKuitansiAlSyukroBody({
+                        siswa: {
+                            ...siswa,
+                            NMCUST: siswa.NMCUST || siswa.nmcust,
+                            DESC02: siswa.DESC02,
+                            DESC03: siswa.DESC03,
+                            CODE02: siswa.CODE02,
+                        },
+                        tagihans: tagihans,
+                        bank: siswa.FIDBANK,
+                        biayaLayanan: 0,
+                        tandaTangan: typeof tandaTangan !== 'undefined' ? tandaTangan : null,
+                        userName: typeof userName !== 'undefined' ? userName : 'Admin Keuangan',
+                        formatMetode: formatMetodePembayaran,
+                        nomor: tagihans[0]?.TRANSNO || tagihans[0]?.NOREFF || null,
+                    })
+                    : [];
+
+                Swal.close();
+                await generatePdf(
+                    (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN'),
+                    content,
+                    siswa.CODE02,
+                    { titleUnderline: true, skipFooter: true }
+                );
+            }
+
+            window.generateKuitansiFromRows = generateKuitansiFromRows;
+
+            document.getElementById('cetak-kuitansi')?.addEventListener('click', async function (e) {
+                e.preventDefault();
+                const selected = DT[`${dtOptions.tableId}`].rows({selected: true}).data().toArray();
+                if (!selected[0]) {
+                    warningAlert('Silahkan pilih tagihan yang sudah dibayar atau pernah dicicil!');
+                    return;
+                }
+                await generateKuitansiFromRows(selected);
+            });
 
             document.getElementById('cetak-kartu-siswa').addEventListener('click', async function (e) {
                 e.preventDefault();

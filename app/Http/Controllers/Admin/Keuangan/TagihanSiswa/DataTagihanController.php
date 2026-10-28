@@ -164,6 +164,22 @@ class DataTagihanController extends Controller
                 'duplicate' => false,
             ],
             [
+                'data' => 'kuitansi',
+                'name' => 'Kuitansi',
+                'orderable' => false,
+                'dataVal' => false,
+                'columnType' => 'button',
+                'className' => 'text-center exclude-selection',
+                'excludeFromSelection' => true,
+                'button' => 'action',
+                'buttonText' => 'Kuitansi',
+                'buttonClass' => 'btn btn-sm btn-success btn-kuitansi',
+                'buttonLink' => '#',
+                'buttonIcon' => 'ri-printer-line me-2',
+                'exportable' => false,
+                'duplicate' => false,
+            ],
+            [
                 'data' => 'delete',
                 'name' => 'Reversal',
                 'orderable' => false,
@@ -580,7 +596,7 @@ class DataTagihanController extends Controller
         $columnName = 'scctbill.FUrutan';
         $columnSortOrder = 'asc';
         $userOrdered = false;
-        $nonSortableData = ['AA', 'naik', 'turun', 'delete', 'hapus', 'print', 'NOVA', 'detail_trx'];
+        $nonSortableData = ['AA', 'naik', 'turun', 'delete', 'hapus', 'print', 'kuitansi', 'NOVA', 'detail_trx'];
 
         if (!empty($order_arr)) {
             $columnIndex = $columnIndex_arr[0]['column'] ?? null;
@@ -776,6 +792,7 @@ class DataTagihanController extends Controller
                     'BILLPAID' => $get('BILLPAID'),
                     'PAYMENTLEFT' => $get('PAYMENTLEFT'),
                     'BILLAC' => PeriodeHelper::label($get('BILLAC')),
+                    'BILLAC_CODE' => $get('BILLAC'),
                     'BTA' => $get('BTA'),
                     'PAIDST' => $get('PAIDST'),
                     'INSTALLMENT' => (int) ($get('INSTALLMENT') ?? 0),
@@ -789,6 +806,7 @@ class DataTagihanController extends Controller
                     'TRX_LOGS' => [],
                     'BILL_TRANSNO' => $get('BILL_TRANSNO'),
                     'print' => true,
+                    'kuitansi' => $billPaid > 0,
                     'delete' => $billPaid > 0,
                     'delete_label' => 'Reversal',
                     'hapus' => $canHapus,

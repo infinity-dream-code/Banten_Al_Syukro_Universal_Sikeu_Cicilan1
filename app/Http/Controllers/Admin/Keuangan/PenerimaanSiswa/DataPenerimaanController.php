@@ -141,6 +141,22 @@ class DataPenerimaanController extends Controller
             ['data' => 'PAIDDT', 'name' => 'Tanggal Bayar', 'columnType' => 'timestamp', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'BTA', 'name' => 'Tahun AKA', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             [
+                'data' => 'kuitansi',
+                'name' => 'Kuitansi',
+                'orderable' => false,
+                'dataVal' => false,
+                'columnType' => 'button',
+                'className' => 'text-center exclude-selection',
+                'excludeFromSelection' => true,
+                'button' => 'action',
+                'buttonText' => 'Kuitansi',
+                'buttonClass' => 'btn btn-sm btn-success btn-kuitansi',
+                'buttonLink' => '#',
+                'buttonIcon' => 'ri-printer-line me-2',
+                'exportable' => false,
+                'duplicate' => false,
+            ],
+            [
                 'data' => 'delete',
                 'name' => '',
                 'orderable' => false,
@@ -178,7 +194,7 @@ class DataPenerimaanController extends Controller
             if (
                 $columnIndex !== null &&
                 !empty($columnName_arr[$columnIndex]['data']) &&
-                !in_array($columnName_arr[$columnIndex]['data'], ['no', 'AA', 'detail_trx', 'delete'], true)
+                !in_array($columnName_arr[$columnIndex]['data'], ['no', 'AA', 'detail_trx', 'delete', 'kuitansi'], true)
             ) {
                 $columnName = $this->resolveOrderColumn($columnName_arr[$columnIndex]['data']);
                 $columnSortOrder = $order_arr[0]['dir'] ?? 'desc';
@@ -394,6 +410,7 @@ class DataPenerimaanController extends Controller
                 );
                 $item->NOREFF = $item->BILL_NOREFF ?? $item->NOREFF ?? null;
                 $item->delete = $billId && $nominalBayar > 0;
+                $item->kuitansi = $billId && $nominalBayar > 0;
                 $item->detail_trx = (bool) $billId;
                 $item->NOCUST = $item->nocust;
                 $item->NMCUST = $item->nmcust;
