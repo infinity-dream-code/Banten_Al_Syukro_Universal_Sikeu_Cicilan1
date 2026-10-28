@@ -95,7 +95,7 @@
                 <em>{{ $total > 0 ? $terbilangPdf($total) . ' Rupiah' : 'Nol Rupiah' }}</em>
                 <br>
                 @php
-                    $ttdPath = public_path(config('app.ttd_kuitansi', 'ttd.jpeg'));
+                    $ttdPath = public_path(config('app.ttd_kuitansi', 'ttd.png'));
                     $ttdMime = strtolower(pathinfo($ttdPath, PATHINFO_EXTENSION)) === 'png' ? 'image/png' : 'image/jpeg';
                 @endphp
                 @if(is_file($ttdPath))

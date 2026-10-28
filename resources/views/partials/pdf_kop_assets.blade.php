@@ -9,7 +9,7 @@
     $pdfEdunesiaPath = public_path(config('app.logo_great_edunesia', 'great-edunesia.png'));
     $pdfEdunesiaB64 = is_file($pdfEdunesiaPath) ? base64_encode(file_get_contents($pdfEdunesiaPath)) : '';
 
-    $pdfTtdPath = public_path(config('app.ttd_kuitansi', 'ttd.jpeg'));
+    $pdfTtdPath = public_path(config('app.ttd_kuitansi', 'ttd.png'));
     $pdfTtdExt = strtolower(pathinfo($pdfTtdPath, PATHINFO_EXTENSION));
     $pdfTtdMime = $pdfTtdExt === 'png' ? 'image/png' : 'image/jpeg';
     $pdfTtdB64 = is_file($pdfTtdPath) ? base64_encode(file_get_contents($pdfTtdPath)) : '';

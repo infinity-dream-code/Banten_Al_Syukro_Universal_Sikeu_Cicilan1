@@ -31,7 +31,7 @@ return [
     // Logo mitra di kop surat / kuitansi (kanan): Dompet Dhuafa + Great Edunesia
     'logo_dompet_dhuafa' => env('APP_LOGO_DOMPET_DHUAFA', 'logo-dompet-dhuafa.png'),
     'logo_great_edunesia' => env('APP_LOGO_GREAT_EDUNESIA', 'great-edunesia.png'),
-    'ttd_kuitansi' => env('APP_TTD_KUITANSI', 'ttd.jpeg'),
+    'ttd_kuitansi' => env('APP_TTD_KUITANSI', 'ttd.png'),
     'nama_ttd_kuitansi' => env('APP_NAMA_TTD_KUITANSI', 'Cut Tia Andani, S.Ak.'),
     'email' => env('APP_EMAIL', 'ypisabkho@gmail.com'),
     'telepon' => env('APP_TELEPON', 'SIKEU'),
