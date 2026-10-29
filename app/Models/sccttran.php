@@ -32,4 +32,21 @@ class sccttran extends Model
         "INSTALLMENT",
         "isreversal",
     ];
+
+    public function scopeNotReversed($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('isreversal')
+                ->orWhere('isreversal', 0)
+                ->orWhere('isreversal', '0');
+        });
+    }
+
+    public function scopeHasNominal($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereRaw('CAST(COALESCE(DEBET, 0) AS SIGNED) > 0')
+                ->orWhereRaw('CAST(COALESCE(KREDIT, 0) AS SIGNED) > 0');
+        });
+    }
 }

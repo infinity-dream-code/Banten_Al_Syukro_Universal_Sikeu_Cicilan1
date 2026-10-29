@@ -458,6 +458,8 @@ class DataPenerimaanController extends Controller
         if (empty($logs)) {
             $logs = sccttran::query()
                 ->where('BILLID', $id)
+                ->notReversed()
+                ->hasNominal()
                 ->orderBy('TRXDATE', 'desc')
                 ->get(['TRXDATE', 'METODE', 'DEBET', 'KREDIT', 'FIDBANK', 'NOREFF', 'TRANSNO'])
                 ->map(function ($trx) {
@@ -531,6 +533,8 @@ class DataPenerimaanController extends Controller
         try {
             $primaryLogs = sccttran::query()
                 ->where('BILLID', $aa)
+                ->notReversed()
+                ->hasNominal()
                 ->orderBy('TRXDATE', 'desc')
                 ->get(['TRXDATE', 'METODE', 'DEBET', 'KREDIT', 'FIDBANK', 'NOREFF', 'TRANSNO']);
 
@@ -548,6 +552,8 @@ class DataPenerimaanController extends Controller
                     ->when(!blank($custId), function ($q) use ($custId) {
                         $q->where('CUSTID', $custId);
                     })
+                    ->notReversed()
+                    ->hasNominal()
                     ->orderBy('TRXDATE', 'desc')
                     ->get(['TRXDATE', 'METODE', 'DEBET', 'KREDIT', 'FIDBANK', 'NOREFF', 'TRANSNO']);
             }
