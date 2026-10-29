@@ -14,10 +14,16 @@ class TagihanPaymentReversal
 {
     private const SALDO_FIDBANK = '1140002';
 
-    /** Batalkan pembayaran terakhir. Cash/bank lain tidak boleh masuk saldo. */
+    /** Batalkan pembayaran terakhir. VA/FROM INVOICE mengembalikan saldo. Cash/bank lain tidak. */
     public function reverseLastPayment(scctbill $tagihan, Request $request): void
     {
         if (!$this->hasBillPayments($tagihan)) {
+            return;
+        }
+
+        if ($this->hasUnreversedInvoicePayment($tagihan)) {
+            $this->reverseFromInvoice($tagihan);
+            $tagihan->refresh();
             return;
         }
 
@@ -70,7 +76,82 @@ class TagihanPaymentReversal
             return true;
         }
 
-        return $this->paymentTransactionQuery($tagihan)->exists();
+        return $this->hasUnreversedInvoicePayment($tagihan)
+            || $this->paymentTransactionQuery($tagihan)->exists();
+    }
+
+    /** VA: batalkan cicilan FROM INVOICE terakhir, debet di-nolkan supaya saldo kembali. */
+    private function reverseFromInvoice(scctbill $tagihan): void
+    {
+        $lastInstallment = (int) $this->invoicePaymentQuery($tagihan)->max('INSTALLMENT');
+
+        $invoiceQuery = $this->invoicePaymentQuery($tagihan);
+        if ($lastInstallment > 0) {
+            $invoiceQuery->where('INSTALLMENT', $lastInstallment);
+        }
+
+        $updated = $this->markInvoiceReversed($invoiceQuery);
+        if ($updated === 0) {
+            $this->markInvoiceReversed($this->invoicePaymentQuery($tagihan));
+        }
+
+        $this->refreshBillFromRemainingPayments($tagihan);
+
+        Log::info('tagihan-payment.reverse.from-invoice', [
+            'aa' => $tagihan->AA,
+            'custid' => $tagihan->CUSTID,
+            'installment' => $lastInstallment,
+            'updated' => $updated,
+        ]);
+    }
+
+    private function refreshBillFromRemainingPayments(scctbill $tagihan): void
+    {
+        $billAm = (int) ($tagihan->BILLAM ?? 0);
+        $paid = (int) sccttran::query()
+            ->where('BILLID', $tagihan->AA)
+            ->where('CUSTID', $tagihan->CUSTID)
+            ->whereRaw("UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?)", ['FROM INVOICE', 'FROM TELLER'])
+            ->where('DEBET', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('isreversal')
+                    ->orWhere('isreversal', 0)
+                    ->orWhere('isreversal', '0');
+            })
+            ->sum('DEBET');
+
+        $remainingInstal = (int) sccttran::query()
+            ->where('BILLID', $tagihan->AA)
+            ->where('CUSTID', $tagihan->CUSTID)
+            ->whereRaw("UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?)", ['FROM INVOICE', 'FROM TELLER'])
+            ->where('DEBET', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('isreversal')
+                    ->orWhere('isreversal', 0)
+                    ->orWhere('isreversal', '0');
+            })
+            ->max('INSTALLMENT');
+
+        $lastPaid = sccttran::query()
+            ->where('BILLID', $tagihan->AA)
+            ->where('CUSTID', $tagihan->CUSTID)
+            ->whereRaw("UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?)", ['FROM INVOICE', 'FROM TELLER'])
+            ->where('DEBET', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('isreversal')
+                    ->orWhere('isreversal', 0)
+                    ->orWhere('isreversal', '0');
+            })
+            ->orderByDesc('TRXDATE')
+            ->value('TRXDATE');
+
+        $tagihan->update([
+            'BILLPAID' => $paid,
+            'PAYMENTLEFT' => max(0, $billAm - $paid),
+            'PAIDST' => $paid > 0 && $paid >= $billAm ? 1 : 0,
+            'PAIDDT' => $paid > 0 ? $lastPaid : null,
+            'INSTALLMENT' => $paid > 0 ? $remainingInstal : 0,
+        ]);
     }
 
     private function reverseTellerWithoutSaldo(scctbill $tagihan): void
@@ -87,6 +168,42 @@ class TagihanPaymentReversal
             'PAYMENTLEFT' => $billAm,
             'INSTALLMENT' => 0,
         ]);
+    }
+
+    private function markInvoiceReversed($query): int
+    {
+        try {
+            return (int) $query->update([
+                'isreversal' => 1,
+                'DEBET' => 0,
+            ]);
+        } catch (\Throwable $e) {
+            if (stripos($e->getMessage(), 'isreversal') === false
+                && stripos($e->getMessage(), 'Unknown column') === false) {
+                throw $e;
+            }
+
+            return (int) $query->update(['DEBET' => 0]);
+        }
+    }
+
+    private function hasUnreversedInvoicePayment(scctbill $tagihan): bool
+    {
+        return $this->invoicePaymentQuery($tagihan)->exists();
+    }
+
+    private function invoicePaymentQuery(scctbill $tagihan)
+    {
+        return sccttran::query()
+            ->where('BILLID', $tagihan->AA)
+            ->where('CUSTID', $tagihan->CUSTID)
+            ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM INVOICE'])
+            ->where('DEBET', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('isreversal')
+                    ->orWhere('isreversal', 0)
+                    ->orWhere('isreversal', '0');
+            });
     }
 
     private function paymentTransactionQuery(scctbill $tagihan)
@@ -128,6 +245,7 @@ class TagihanPaymentReversal
                 ->where('CUSTID', $tagihan->CUSTID)
                 ->where(function ($q) {
                     $q->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
+                        ->orWhereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM INVOICE'])
                         ->orWhereRaw('UPPER(TRIM(COALESCE(METODE, ""))) IN (?, ?)', ['REVERSAL', 'JURNAL SALDO']);
                 })
                 ->update(['isreversal' => 1]);
