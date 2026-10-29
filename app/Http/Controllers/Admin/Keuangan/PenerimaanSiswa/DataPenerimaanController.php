@@ -1019,6 +1019,7 @@ class DataPenerimaanController extends Controller
                                 ])
                                 ->where('scctbill.BILLNM', $item->tagihan)
                                 ->where('scctbill.PAIDST', 1)
+                                ->whereIn('scctbill.FSTSBolehBayar', [1, '1'])
                                 ->where('scctbill.PAIDDT', '!=', null)
                                 ->where(function ($query) use ($filterQuery) {
                                     if ($filterQuery) {
