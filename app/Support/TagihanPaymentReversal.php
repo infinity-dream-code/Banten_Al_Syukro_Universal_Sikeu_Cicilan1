@@ -14,6 +14,9 @@ class TagihanPaymentReversal
 {
     private const SALDO_FIDBANK = '1140002';
 
+    /** Manual bayar: BuilderPaymentCash tulis CASH, import/legacy tulis FROM TELLER. */
+    private const MANUAL_PAY_METODES = ['FROM TELLER', 'CASH'];
+
     /** Batalkan pembayaran terakhir. VA/FROM INVOICE mengembalikan saldo. Cash/bank lain tidak. */
     public function reverseLastPayment(scctbill $tagihan, Request $request): void
     {
@@ -23,6 +26,13 @@ class TagihanPaymentReversal
 
         if ($this->hasUnreversedInvoicePayment($tagihan)) {
             $this->reverseFromInvoice($tagihan);
+            $tagihan->refresh();
+            return;
+        }
+
+        if ($this->hasUnreversedManualPayment($tagihan)) {
+            $this->reverseTellerWithoutSaldo($tagihan);
+            $this->markPaymentReversed($tagihan);
             $tagihan->refresh();
             return;
         }
@@ -111,7 +121,10 @@ class TagihanPaymentReversal
         $paid = (int) sccttran::query()
             ->where('BILLID', $tagihan->AA)
             ->where('CUSTID', $tagihan->CUSTID)
-            ->whereRaw("UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?)", ['FROM INVOICE', 'FROM TELLER'])
+            ->whereRaw(
+                "UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?, ?)",
+                ['FROM INVOICE', 'FROM TELLER', 'CASH']
+            )
             ->where('DEBET', '>', 0)
             ->where(function ($q) {
                 $q->whereNull('isreversal')
@@ -123,7 +136,10 @@ class TagihanPaymentReversal
         $remainingInstal = (int) sccttran::query()
             ->where('BILLID', $tagihan->AA)
             ->where('CUSTID', $tagihan->CUSTID)
-            ->whereRaw("UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?)", ['FROM INVOICE', 'FROM TELLER'])
+            ->whereRaw(
+                "UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?, ?)",
+                ['FROM INVOICE', 'FROM TELLER', 'CASH']
+            )
             ->where('DEBET', '>', 0)
             ->where(function ($q) {
                 $q->whereNull('isreversal')
@@ -135,7 +151,10 @@ class TagihanPaymentReversal
         $lastPaid = sccttran::query()
             ->where('BILLID', $tagihan->AA)
             ->where('CUSTID', $tagihan->CUSTID)
-            ->whereRaw("UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?)", ['FROM INVOICE', 'FROM TELLER'])
+            ->whereRaw(
+                "UPPER(TRIM(COALESCE(METODE, ''))) IN (?, ?, ?)",
+                ['FROM INVOICE', 'FROM TELLER', 'CASH']
+            )
             ->where('DEBET', '>', 0)
             ->where(function ($q) {
                 $q->whereNull('isreversal')
@@ -192,6 +211,11 @@ class TagihanPaymentReversal
         return $this->invoicePaymentQuery($tagihan)->exists();
     }
 
+    private function hasUnreversedManualPayment(scctbill $tagihan): bool
+    {
+        return $this->paymentTransactionQuery($tagihan)->exists();
+    }
+
     private function invoicePaymentQuery(scctbill $tagihan)
     {
         return sccttran::query()
@@ -211,8 +235,14 @@ class TagihanPaymentReversal
         return sccttran::query()
             ->where('BILLID', $tagihan->AA)
             ->where('CUSTID', $tagihan->CUSTID)
-            ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
-            ->where('DEBET', '>', 0)
+            ->whereRaw(
+                'UPPER(TRIM(COALESCE(METODE, ""))) IN (?, ?)',
+                self::MANUAL_PAY_METODES
+            )
+            ->where(function ($q) {
+                $q->where('DEBET', '>', 0)
+                    ->orWhere('KREDIT', '>', 0);
+            })
             ->where(function ($q) {
                 $q->whereNull('isreversal')
                     ->orWhere('isreversal', 0)
@@ -232,7 +262,10 @@ class TagihanPaymentReversal
             ->where('BILLID', $tagihan->AA)
             ->where('CUSTID', $tagihan->CUSTID)
             ->where('INSTALLMENT', $lastInstallment)
-            ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
+            ->whereRaw(
+                'UPPER(TRIM(COALESCE(METODE, ""))) IN (?, ?)',
+                self::MANUAL_PAY_METODES
+            )
             ->where('KREDIT', '>', 0)
             ->update(['KREDIT' => 0]);
     }
@@ -243,11 +276,10 @@ class TagihanPaymentReversal
             sccttran::query()
                 ->where('BILLID', $tagihan->AA)
                 ->where('CUSTID', $tagihan->CUSTID)
-                ->where(function ($q) {
-                    $q->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
-                        ->orWhereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM INVOICE'])
-                        ->orWhereRaw('UPPER(TRIM(COALESCE(METODE, ""))) IN (?, ?)', ['REVERSAL', 'JURNAL SALDO']);
-                })
+                ->whereRaw(
+                    'UPPER(TRIM(COALESCE(METODE, ""))) IN (?, ?, ?, ?, ?)',
+                    ['FROM TELLER', 'CASH', 'FROM INVOICE', 'REVERSAL', 'JURNAL SALDO']
+                )
                 ->update(['isreversal' => 1]);
         } catch (\Throwable $e) {
             if (stripos($e->getMessage(), 'isreversal') === false
