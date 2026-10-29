@@ -605,6 +605,7 @@ class DataPenerimaanController extends Controller
             })
             ->where($this->notReversedTranScope())
             ->whereIn('scctbill.PAIDST', [1, '1'])
+            ->whereIn('scctbill.FSTSBolehBayar', [1, '1'])
             ->where(function ($q) {
                 $q->whereRaw('CAST(COALESCE(sccttran.DEBET, 0) AS SIGNED) > 0')
                     ->orWhereRaw('CAST(COALESCE(sccttran.KREDIT, 0) AS SIGNED) > 0');
