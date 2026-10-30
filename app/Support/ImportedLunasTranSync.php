@@ -40,10 +40,10 @@ class ImportedLunasTranSync
             'METODE' => 'FROM TELLER',
             'TRXDATE' => $bill->PAIDDT ?: now(),
             'NOREFF' => 'TELLER',
-            // Import lunas dicatat sebagai Manual BCAS, tidak masuk debet saldo VA
+            // Import lunas: Manual BCAS, DEBET=KREDIT supaya web tagihan tidak memotong saldo VA
             'FIDBANK' => '1140001',
             'DEBET' => $nominal,
-            'KREDIT' => 0,
+            'KREDIT' => $nominal,
             'BILLID' => $bill->AA,
             'BILLTARGET' => $bill->BILLNM,
             'INSTALLMENT' => (int) ($bill->INSTALLMENT ?: 1),
@@ -91,10 +91,10 @@ class ImportedLunasTranSync
         return $count;
     }
 
-    /** Import lunas historis tidak boleh mengurangi saldo VA. */
+    /** Import lunas historis tidak boleh mengurangi saldo VA di web tagihan. */
     public static function neutralizeImportedSaldoImpact(): int
     {
-        return sccttran::query()
+        $fidUpdated = sccttran::query()
             ->whereRaw('UPPER(TRIM(COALESCE(NOREFF, ""))) = ?', ['TELLER'])
             ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
             ->where(function ($q) {
@@ -103,6 +103,43 @@ class ImportedLunasTranSync
                     ->orWhereNotIn('FIDBANK', ['1140000', '1140001', '1140002']);
             })
             ->update(['FIDBANK' => '1140001']);
+
+        $importTeller = sccttran::query()
+            ->whereRaw('UPPER(TRIM(COALESCE(NOREFF, ""))) = ?', ['TELLER'])
+            ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
+            ->where('DEBET', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('KREDIT')
+                    ->orWhere('KREDIT', 0)
+                    ->orWhere('KREDIT', '0');
+            })
+            ->where(function ($q) {
+                $q->whereNull('isreversal')
+                    ->orWhere('isreversal', 0)
+                    ->orWhere('isreversal', '0');
+            });
+
+        try {
+            $kreditUpdated = $importTeller->update(['KREDIT' => DB::raw('DEBET')]);
+        } catch (\Throwable $e) {
+            if (stripos($e->getMessage(), 'isreversal') === false
+                && stripos($e->getMessage(), 'Unknown column') === false) {
+                throw $e;
+            }
+
+            $kreditUpdated = sccttran::query()
+                ->whereRaw('UPPER(TRIM(COALESCE(NOREFF, ""))) = ?', ['TELLER'])
+                ->whereRaw('UPPER(TRIM(COALESCE(METODE, ""))) = ?', ['FROM TELLER'])
+                ->where('DEBET', '>', 0)
+                ->where(function ($q) {
+                    $q->whereNull('KREDIT')
+                        ->orWhere('KREDIT', 0)
+                        ->orWhere('KREDIT', '0');
+                })
+                ->update(['KREDIT' => DB::raw('DEBET')]);
+        }
+
+        return (int) $fidUpdated + (int) $kreditUpdated;
     }
 
     /** Contoh: BCAS26/102000003 (tahun 2 digit / day-of-year 3 digit + urutan 6 digit). */
