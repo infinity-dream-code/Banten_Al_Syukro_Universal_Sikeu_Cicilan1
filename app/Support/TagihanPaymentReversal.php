@@ -80,6 +80,10 @@ class TagihanPaymentReversal
 
     public function hasBillPayments(scctbill $tagihan): bool
     {
+        if ((int) ($tagihan->BILLPAID ?? 0) > 0) {
+            return true;
+        }
+
         return $this->hasUnreversedInvoicePayment($tagihan)
             || $this->paymentTransactionQuery($tagihan)->exists();
     }

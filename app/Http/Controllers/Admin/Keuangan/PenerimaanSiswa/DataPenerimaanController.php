@@ -15,7 +15,6 @@ use App\Models\sccttran;
 use App\Models\User;
 use App\Support\CacheHandler;
 use App\Support\FilterHandler;
-use App\Support\ImportedLunasTranSync;
 use App\Support\MetodeBayarHelper;
 use App\Support\TagihanPaymentReversal;
 use Auth;
@@ -34,8 +33,8 @@ class DataPenerimaanController extends Controller
     private string $mainTitle = 'Data Pembayaran';
     private string $cacheKey = 'data penerimaan';
     private array $allowedFilters = [
-        'dari_tanggal' => 'sccttran.TRXDATE_start',
-        'sampai_tanggal' => 'sccttran.TRXDATE_end',
+        'dari_tanggal' => 'scctbill.PAIDDT_start',
+        'sampai_tanggal' => 'scctbill.PAIDDT_end',
         'tahun_akademik' => 'scctbill.BTA',
         'post' => 'scctbill.BILLNM',
         'kelas' => 'scctcust.DESC02',
@@ -45,7 +44,7 @@ class DataPenerimaanController extends Controller
         'angkatan' => 'scctcust.DESC04',
         'periode_mulai' => 'scctbill.BILLAC_start',
         'periode_akhir' => 'scctbill.BILLAC_end',
-        'bank' => 'sccttran.FIDBANK',
+        'bank' => 'scctbill.FIDBANK',
     ];
 
     public function __construct()
@@ -65,12 +64,6 @@ class DataPenerimaanController extends Controller
 
     public function index()
     {
-        try {
-            ImportedLunasTranSync::syncMissing();
-        } catch (\Throwable $e) {
-            Log::warning('Sync sccttran import lunas gagal', ['message' => $e->getMessage()]);
-        }
-
         $data['title'] = $this->title;
         $data['mainTitle'] = $this->mainTitle;
         $data['columnsUrl'] = $this->columnsUrl();
@@ -186,7 +179,7 @@ class DataPenerimaanController extends Controller
         $search_arr = $request->get('search', []);
         $searchValue = $search_arr['value'] ?? '';
 
-        $columnName = 'sccttran.TRXDATE';
+        $columnName = 'scctbill.PAIDDT';
         $columnSortOrder = 'desc';
 
         if (!empty($order_arr)) {
@@ -215,16 +208,16 @@ class DataPenerimaanController extends Controller
         if ($filter) {
             foreach ($filter as $key => $val) {
                 switch ($key) {
-                    case 'sccttran.TRXDATE_start':
+                    case 'scctbill.PAIDDT_start':
                         $date = Carbon::createFromFormat('d-m-Y', $val)->startOfDay();
                         if ($date) {
-                            $filters[] = ['sccttran.TRXDATE', '>=', $date];
+                            $filters[] = ['scctbill.PAIDDT', '>=', $date];
                         }
                         break;
-                    case 'sccttran.TRXDATE_end':
+                    case 'scctbill.PAIDDT_end':
                         $date = Carbon::createFromFormat('d-m-Y', $val)->endOfDay();
                         if ($date) {
-                            $filters[] = ['sccttran.TRXDATE', '<=', $date];
+                            $filters[] = ['scctbill.PAIDDT', '<=', $date];
                         }
                         break;
                     case 'scctbill.BILLAC_start':
@@ -257,15 +250,10 @@ class DataPenerimaanController extends Controller
                         $colName = is_numeric($val) ? 'scctcust.NOCUST' : $key;
                         ($colName) && $filters[] = [$colName, 'like', $val];
                         break;
-                    case 'sccttran.FIDBANK':
+                    case 'scctbill.FIDBANK':
                         if ((string) $val === MetodeBayarHelper::ANDROID_FIDBANK) {
                             $androidBankFilter = 'only';
-                        } elseif ((string) $val === '1140003') {
-                            // Transfer Bank Lain: ambil dari scctbill.FIDBANK
-                            $filters[] = ['scctbill.FIDBANK', '=', '1140003'];
-                            $androidBankFilter = 'exclude';
                         } else {
-                            // Manual Cash/BMI/SALDO: filter dari scctbill.FIDBANK
                             $filters[] = ['scctbill.FIDBANK', '=', $val];
                             $androidBankFilter = 'exclude';
                         }
@@ -304,23 +292,23 @@ class DataPenerimaanController extends Controller
         $whereAny = [
             'scctcust.nmcust',
             'scctcust.nocust',
-            'sccttran.BILLTARGET',
-            'sccttran.TRANSNO',
+            'scctbill.BILLNM',
+            'scctbill.TRANSNO',
         ];
 
         $select = [
-            'sccttran.urut',
-            'sccttran.CUSTID',
-            'sccttran.BILLID',
-            'sccttran.BILLTARGET',
-            'sccttran.METODE',
-            'sccttran.TRXDATE',
-            'sccttran.FIDBANK',
-            'sccttran.NOREFF',
-            'sccttran.DEBET',
-            'sccttran.KREDIT',
-            'sccttran.TRANSNO',
-            'sccttran.INSTALLMENT',
+            'scctbill.AA',
+            'scctbill.CUSTID',
+            'scctbill.BILLNM',
+            'scctbill.BILLAM',
+            'scctbill.BILLPAID',
+            'scctbill.PAIDDT',
+            'scctbill.FIDBANK',
+            'scctbill.NOREFF',
+            'scctbill.TRANSNO',
+            'scctbill.BTA',
+            'scctbill.BILLAC',
+            'scctbill.PAIDST',
             'scctcust.nocust',
             'scctcust.nmcust',
             'scctcust.CODE02',
@@ -328,15 +316,6 @@ class DataPenerimaanController extends Controller
             'scctcust.DESC03',
             'scctcust.NUM2ND',
             'scctcust.GENUS',
-            'scctbill.AA',
-            'scctbill.BILLNM',
-            'scctbill.NOREFF as BILL_NOREFF',
-            'scctbill.FIDBANK as BILL_FIDBANK',
-            'scctbill.BILLAM as BILLAM_TOTAL',
-            'scctbill.BILLPAID',
-            'scctbill.BILLAC',
-            'scctbill.PAIDST',
-            'scctbill.BTA',
             DB::raw('NULL as GENUS1'),
         ];
 
@@ -378,7 +357,7 @@ class DataPenerimaanController extends Controller
             now()->addMinutes(10),
             function () use ($query) {
                 return (int) (clone $query)->selectRaw(
-                    'COALESCE(SUM(CASE WHEN CAST(COALESCE(sccttran.DEBET, 0) AS SIGNED) > 0 THEN CAST(sccttran.DEBET AS SIGNED) ELSE CAST(COALESCE(sccttran.KREDIT, 0) AS SIGNED) END), 0) as total_nominal'
+                    'COALESCE(SUM(CAST(COALESCE(scctbill.BILLPAID, scctbill.BILLAM, 0) AS SIGNED)), 0) as total_nominal'
                 )->value('total_nominal');
             }
         );
@@ -389,26 +368,21 @@ class DataPenerimaanController extends Controller
             ->take($rowperpage)
             ->get()
             ->map(function ($item) {
-                $nominalBayar = (int) ($item->DEBET ?? 0);
+                $nominalBayar = (int) ($item->BILLPAID ?? 0);
                 if ($nominalBayar <= 0) {
-                    $nominalBayar = (int) ($item->KREDIT ?? 0);
+                    $nominalBayar = (int) ($item->BILLAM ?? 0);
                 }
 
-                $billId = $item->BILLID ?? $item->AA;
-                $billName = $item->BILLNM ?? $item->BILLTARGET;
+                $billId = $item->AA;
+                $billNoreff = $item->NOREFF ?? null;
 
-                $item->AA = $billId;
                 $item->item_id = $billId;
-                $item->TRAN_URUT = $item->urut;
-                $item->BILLNM = $billName;
+                $item->TRAN_URUT = null;
                 $item->BILLAM = $nominalBayar;
-                $item->PAIDDT = $item->TRXDATE;
-                // Metode dari scctbill: NOREFF Mobile → ANDROID, selain itu FIDBANK bill
                 $item->FIDBANK = MetodeBayarHelper::resolveDisplayFidBank(
-                    $item->BILL_FIDBANK ?? $item->FIDBANK ?? null,
-                    $item->BILL_NOREFF ?? null
+                    $item->FIDBANK ?? null,
+                    $billNoreff
                 );
-                $item->NOREFF = $item->BILL_NOREFF ?? $item->NOREFF ?? null;
                 $item->delete = $billId && $nominalBayar > 0;
                 $item->kuitansi = $billId && $nominalBayar > 0;
                 $item->detail_trx = (bool) $billId;
@@ -590,33 +564,12 @@ class DataPenerimaanController extends Controller
         );
     }
 
-    private function notReversedTranScope(): \Closure
-    {
-        return function ($query) {
-            $query->where(function ($q) {
-                $q->whereNull('sccttran.isreversal')
-                    ->orWhere('sccttran.isreversal', 0)
-                    ->orWhere('sccttran.isreversal', '0');
-            });
-        };
-    }
-
     private function lunasTranBaseQuery()
     {
-        return sccttran::query()
-            ->leftJoin('scctcust', 'scctcust.CUSTID', '=', 'sccttran.CUSTID')
-            ->leftJoin('scctbill', function ($join) {
-                $join->on('scctbill.AA', '=', 'sccttran.BILLID')
-                    ->on('scctbill.CUSTID', '=', 'sccttran.CUSTID');
-            })
-            ->where($this->notReversedTranScope())
+        return scctbill::query()
+            ->leftJoin('scctcust', 'scctcust.CUSTID', '=', 'scctbill.CUSTID')
             ->whereIn('scctbill.PAIDST', [1, '1'])
-            ->whereIn('scctbill.FSTSBolehBayar', [1, '1'])
-            ->where(function ($q) {
-                $q->whereRaw('CAST(COALESCE(sccttran.DEBET, 0) AS SIGNED) > 0')
-                    ->orWhereRaw('CAST(COALESCE(sccttran.KREDIT, 0) AS SIGNED) > 0');
-            })
-            ->whereRaw("UPPER(TRIM(COALESCE(sccttran.METODE, ''))) NOT IN ('REVERSAL', 'JURNAL SALDO')");
+            ->whereIn('scctbill.FSTSBolehBayar', [1, '1']);
     }
 
     private function resolveOrderColumn(string $column): string
@@ -628,11 +581,11 @@ class DataPenerimaanController extends Controller
             'DESC02' => 'scctcust.DESC02',
             'DESC03' => 'scctcust.DESC03',
             'BILLNM' => 'scctbill.BILLNM',
-            'BILLAM' => 'sccttran.DEBET',
-            'FIDBANK' => 'sccttran.FIDBANK',
-            'PAIDDT' => 'sccttran.TRXDATE',
+            'BILLAM' => 'scctbill.BILLPAID',
+            'FIDBANK' => 'scctbill.FIDBANK',
+            'PAIDDT' => 'scctbill.PAIDDT',
             'BTA' => 'scctbill.BTA',
-            default => str_contains($column, '.') ? $column : 'sccttran.' . $column,
+            default => str_contains($column, '.') ? $column : 'scctbill.' . $column,
         };
     }
 

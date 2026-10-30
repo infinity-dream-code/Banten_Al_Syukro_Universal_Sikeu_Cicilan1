@@ -6,7 +6,6 @@ use App\Imports\Keuangan\TagihanSiswa\ImportTagihanLunasExcel;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
-use App\Support\ImportedLunasTranSync;
 use App\Support\PeriodeHelper;
 use App\Support\SchoolScope;
 use Carbon\Carbon;
@@ -242,7 +241,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                 $urut = $tagihanSiswaTerbaru ? $tagihanSiswaTerbaru['FUrutan'] + 1 : 1;
                 $billCD = date('Y') . '/i' . date('m') . '-' . ($urut + 1);
 
-                $aa = DB::connection('DATA_MYSQL')->table('scctbill')->insertGetId([
+                DB::connection('DATA_MYSQL')->table('scctbill')->insert([
                     'CUSTID' => $siswa->CUSTID,
                     'BILLAC' => $bta,
                     'BILLNM' => $item['billnm'] ?? $item['nama_tagihan'],
@@ -261,12 +260,8 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                     'BILLCD' => $billCD,
                     'INSTALLMENT' => 1,
                     'isINSTALLABLE' => (int) ($item['is_installable'] ?? 0),
-                ], 'AA');
+                ]);
 
-                $bill = scctbill::find($aa);
-                if ($bill) {
-                    ImportedLunasTranSync::writeForBill($bill);
-                }
                 $insertedCount++;
             }
 
