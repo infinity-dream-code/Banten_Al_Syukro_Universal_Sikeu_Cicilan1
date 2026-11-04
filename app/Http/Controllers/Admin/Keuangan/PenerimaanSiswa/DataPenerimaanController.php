@@ -79,7 +79,6 @@ class DataPenerimaanController extends Controller
             });
         })->get();
 //        dd($data['tanda_tangan']);
-        $scctbillModel = new scctbill();
         $allowedBanks = [
             '1140000' => 'Manual Cash',
             '1140002' => 'Manual SALDO',
@@ -87,8 +86,7 @@ class DataPenerimaanController extends Controller
             '1140003' => 'Transfer Bank Lain',
             '6' => 'ANDROID',
         ];
-        $data['bank'] = array_intersect_key($allowedBanks, $scctbillModel->metodeBayar)
-            ?: $allowedBanks;
+        $data['bank'] = MetodeBayarHelper::buildBankFilterOptions($allowedBanks);
 
         return view('admin.keuangan.penerimaan_siswa.data_penerimaan', $data);
     }
@@ -196,7 +194,7 @@ class DataPenerimaanController extends Controller
 
         $filters = [];
         $filterQuery = null;
-        $androidBankFilter = null; // null | only | exclude
+        $bankFilterValue = null;
 
         $filter = FilterHandler::resolveFilters($request->input('filter'), $this->allowedFilters);
         if ($this->sekolah !== null) {
@@ -251,12 +249,7 @@ class DataPenerimaanController extends Controller
                         ($colName) && $filters[] = [$colName, 'like', $val];
                         break;
                     case 'scctbill.FIDBANK':
-                        if ((string) $val === MetodeBayarHelper::ANDROID_FIDBANK) {
-                            $androidBankFilter = 'only';
-                        } else {
-                            $filters[] = ['scctbill.FIDBANK', '=', $val];
-                            $androidBankFilter = 'exclude';
-                        }
+                        $bankFilterValue = (string) $val;
                         break;
                     default:
                         ($key) && $filters[] = [$key, '=', $val];
@@ -333,11 +326,8 @@ class DataPenerimaanController extends Controller
                     $filterQuery($query);
                 }
             })
-            ->when($androidBankFilter === 'only', function ($q) {
-                MetodeBayarHelper::applyAndroidBankFilter($q);
-            })
-            ->when($androidBankFilter === 'exclude', function ($q) {
-                MetodeBayarHelper::excludeMobileNoreff($q);
+            ->when(!blank($bankFilterValue) && strtolower((string) $bankFilterValue) !== 'all', function ($q) use ($bankFilterValue) {
+                MetodeBayarHelper::applyBankFilter($q, $bankFilterValue, 'scctbill.FIDBANK');
             });
 
         $cacheKey = CacheHandler::cacheKey($this->cacheKey, 'data_penerimaan_count', $filter, $searchValue ?? '');
@@ -379,6 +369,7 @@ class DataPenerimaanController extends Controller
                 $item->item_id = $billId;
                 $item->TRAN_URUT = null;
                 $item->BILLAM = $nominalBayar;
+                $item->BILL_NOREFF = $billNoreff;
                 $item->FIDBANK = MetodeBayarHelper::resolveDisplayFidBank(
                     $item->FIDBANK ?? null,
                     $billNoreff

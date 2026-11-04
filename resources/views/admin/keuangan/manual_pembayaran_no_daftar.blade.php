@@ -99,7 +99,13 @@
                                 <option value="1140001">Manual BCAS</option>
                                 <option value="1140002">Manual Saldo</option>
                                 <option value="1140003">Transfer Bank Lain</option>
+                                <option value="lain">Lain-lain</option>
                             </select>
+                        </div>
+                        <div class="mb-5 d-none" id="bank-lain-wrap">
+                            <label class="required form-label" for="bank_lain">Nama Bank</label>
+                            <input type="text" id="bank_lain" name="bank_lain" class="form-control"
+                                   placeholder="Contoh: BSI, Mandiri, BNI" maxlength="50">
                         </div>
                     </div>
                     <div class="col-lg-6">
@@ -262,6 +268,10 @@
 
             formClass.on('submit', function (e) {
                 e.preventDefault()
+                if (String($('#bank').val() || '') === 'lain' && !String($('#bank_lain').val() || '').trim()) {
+                    warningAlert('Isi nama bank Lain-lain terlebih dahulu (contoh: BSI).');
+                    return;
+                }
                 loadingAlert();
                 let url = '{{route('admin.keuangan.manual-pembayaran.store')}}';
                 let tipe = 'POST';
@@ -346,6 +356,15 @@
                 autoclose: true,
             }).datepicker('update', formattedDate);
 
+            function toggleBankLain() {
+                const isLain = String($('#bank').val() || '') === 'lain';
+                $('#bank-lain-wrap').toggleClass('d-none', !isLain);
+                if (!isLain) {
+                    $('#bank_lain').val('');
+                }
+            }
+            $('#bank').on('change', toggleBankLain);
+            toggleBankLain();
 
             $(document).on('click', '.cetak-tagihan', function (e) {
                 printTagihan()
@@ -869,7 +888,15 @@
                 }
             }
 
-            function formatMetodePembayaran(data) {
+            function formatMetodePembayaran(data, noreff) {
+                if (String(noreff || '').trim().toLowerCase() === 'mobile') {
+                    return 'ANDROID';
+                }
+                const reserved = ['mobile', 'mnl', 'teller', 'reversal', 'jurnal saldo', ''];
+                const noreffTrim = String(noreff || '').trim();
+                if (String(data) === '1140003' && noreffTrim && !reserved.includes(noreffTrim.toLowerCase())) {
+                    return noreffTrim;
+                }
                 const descriptions = {
                     '1140000': 'Manual Cash',
                     '1140001': 'Manual BCAS',

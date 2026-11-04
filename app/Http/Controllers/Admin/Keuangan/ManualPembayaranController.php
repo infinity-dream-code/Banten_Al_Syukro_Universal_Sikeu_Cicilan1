@@ -272,7 +272,8 @@ class ManualPembayaranController extends Controller
             [
                 'tanggal' => ['required', 'regex:/^\d{2}-\d{2}-\d{4}$/'],
                 'siswa' => ['required'],
-                'bank' => ['required', 'in:1140000,1140001,1140002,1140003'],
+                'bank' => ['required', 'in:1140000,1140001,1140002,1140003,lain'],
+                'bank_lain' => ['nullable', 'string', 'max:50'],
                 'tagihan.post' => ['required', 'array', 'min:1'],
                 'tagihan.post.*' => ['required'],
                 'tagihan.nominal_bayar' => ['required', 'array', 'min:1'],
@@ -282,6 +283,18 @@ class ManualPembayaranController extends Controller
             ValidationMessage::messages(),
             ValidationMessage::attributes()
         );
+
+        $bankInput = trim((string) $request->input('bank'));
+        $bankLain = trim((string) $request->input('bank_lain', ''));
+        if ($bankInput === MetodeBayarHelper::LAIN_BANK_VALUE && $bankLain === '') {
+            return response()->json(['message' => 'Nama bank Lain-lain wajib diisi (contoh: BSI).'], 422);
+        }
+        if ($bankInput === MetodeBayarHelper::LAIN_BANK_VALUE && !MetodeBayarHelper::isCustomBankNoreff($bankLain)) {
+            return response()->json(['message' => 'Nama bank Lain-lain tidak valid.'], 422);
+        }
+
+        $paymentFidBank = MetodeBayarHelper::resolvePaymentFidBank($bankInput);
+        $customBankNoreff = $bankInput === MetodeBayarHelper::LAIN_BANK_VALUE ? $bankLain : null;
 
         if ($validator->fails()) {
             Log::warning('manual-pembayaran.store.validation_failed', [
@@ -354,7 +367,7 @@ class ManualPembayaranController extends Controller
             DB::beginTransaction();
             DB::connection('DATA_MYSQL')->beginTransaction();
 
-            if ($request->bank == '1140002') {
+            if ($paymentFidBank == '1140002') {
                 $saldoController = new SaldoVirtualAccountController();
                 $saldo = $saldoController->resolveCustSaldo($request->siswa);
                 if ($saldo < $totalBayar) {
@@ -369,7 +382,7 @@ class ManualPembayaranController extends Controller
             }
 
             $transno = null;
-            if (\in_array($request->input('bank'), ['1140000', '1140001', '1140003', '1200001', '1200002'])) {
+            if (\in_array($paymentFidBank, ['1140000', '1140001', '1140003', '1200001', '1200002'], true)) {
                 $last_date = DB::table('ref_invoicedate')->select(['last_date', 'last_number'])->first();
                 if (!$last_date) {
                     DB::table('ref_invoicedate')->insert([
@@ -397,7 +410,7 @@ class ManualPembayaranController extends Controller
                 }
 
                 $lastNumber = (int)($last_date->last_number ?? 0);
-                $transno = date('Ym') . substr(config('app.nova'), 5, 2) . substr($request->input('bank'), -2) . date('d') . $lastNumber;
+                $transno = date('Ym') . substr(config('app.nova'), 5, 2) . substr($paymentFidBank, -2) . date('d') . $lastNumber;
             }
 
             $paymentBuilder = app(ManualPaymentBuilder::class);
@@ -430,16 +443,38 @@ class ManualPembayaranController extends Controller
                 $paymentBuilder->payBill(
                     $item,
                     $nominal,
-                    (string) $request->input('bank'),
+                    $paymentFidBank,
                     $formattedDate,
                     $transno,
                     $request
                 );
 
+                if ($customBankNoreff !== null) {
+                    scctbill::query()
+                        ->where('AA', $item->AA)
+                        ->where('CUSTID', $item->CUSTID)
+                        ->update([
+                            'FIDBANK' => MetodeBayarHelper::LAIN_FIDBANK,
+                            'NOREFF' => $customBankNoreff,
+                        ]);
+
+                    $lastTran = sccttran::query()
+                        ->where('BILLID', $item->AA)
+                        ->where('CUSTID', $item->CUSTID)
+                        ->orderByDesc('urut')
+                        ->first();
+                    if ($lastTran) {
+                        $lastTran->FIDBANK = MetodeBayarHelper::LAIN_FIDBANK;
+                        $lastTran->NOREFF = $customBankNoreff;
+                        $lastTran->save();
+                    }
+                }
+
                 $tagihanForPrint[] = $item->AA;
                 $paymentsForReceipt[(string) $item->AA] = [
                     'nominal' => $nominal,
-                    'fidbank' => (string) $request->input('bank'),
+                    'fidbank' => $paymentFidBank,
+                    'bank_label' => $customBankNoreff ?? $paymentFidBank,
                     'tanggal' => $formattedDate,
                 ];
 
@@ -494,7 +529,8 @@ class ManualPembayaranController extends Controller
             session(['siswa_tagihan_baru_dibayar' => $siswa]);
             session(['tagihan_baru_dibayar' => $tagihanForPrint]);
             session(['manual_pembayaran_receipt' => [
-                'bank' => (string) $request->input('bank'),
+                'bank' => $customBankNoreff ?? $paymentFidBank,
+                'fidbank' => $paymentFidBank,
                 'tanggal' => $formattedDate,
                 'payments' => $paymentsForReceipt,
             ]]);
@@ -502,7 +538,8 @@ class ManualPembayaranController extends Controller
             DB::commit();
             Log::info('manual-pembayaran.store.success', [
                 'siswa' => $request->input('siswa'),
-                'bank' => $request->input('bank'),
+                'bank' => $paymentFidBank,
+                'bank_lain' => $customBankNoreff,
                 'total_bayar' => $totalBayar,
                 'tagihan_terbayar' => count($tagihanForPrint),
             ]);

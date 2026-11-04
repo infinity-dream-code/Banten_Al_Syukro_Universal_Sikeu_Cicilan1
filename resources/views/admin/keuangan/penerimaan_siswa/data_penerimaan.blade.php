@@ -1119,6 +1119,11 @@
                 if (String(noreff || '').trim().toLowerCase() === 'mobile') {
                     return 'ANDROID';
                 }
+                const reserved = ['mobile', 'mnl', 'teller', 'reversal', 'jurnal saldo', ''];
+                const noreffTrim = String(noreff || '').trim();
+                if (String(data) === '1140003' && noreffTrim && !reserved.includes(noreffTrim.toLowerCase())) {
+                    return noreffTrim;
+                }
                 const descriptions = {
                     '1140000': 'Manual Cash',
                     '1140001': 'Manual BCAS',

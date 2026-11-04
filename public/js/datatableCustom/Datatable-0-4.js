@@ -1610,9 +1610,15 @@ async function getDT(options) {
                             case 'custom_code_tagihan':
                                 renderFunc = function (data, type, row) {
                                     // ANDROID hanya dari scctbill.NOREFF = Mobile
-                                    const billNoreff = String(row?.BILL_NOREFF ?? '').trim().toLowerCase();
+                                    const billNoreffRaw = String(row?.BILL_NOREFF ?? row?.NOREFF ?? '').trim();
+                                    const billNoreff = billNoreffRaw.toLowerCase();
                                     if (billNoreff === 'mobile') {
                                         return 'ANDROID';
+                                    }
+                                    const reserved = ['mobile', 'mnl', 'teller', 'reversal', 'jurnal saldo', ''];
+                                    // Lain-lain: FIDBANK 1140003 + nama bank bebas di NOREFF
+                                    if (String(data) === '1140003' && billNoreffRaw && !reserved.includes(billNoreff)) {
+                                        return billNoreffRaw;
                                     }
                                     const descriptions = {
                                         '1140000': 'Manual Cash',
