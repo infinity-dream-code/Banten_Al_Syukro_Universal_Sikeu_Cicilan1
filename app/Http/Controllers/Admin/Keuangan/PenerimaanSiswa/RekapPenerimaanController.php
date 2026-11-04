@@ -116,9 +116,15 @@ class RekapPenerimaanController extends Controller
             return 'TOP UP';
         }
 
+        // ANDROID dari scctbill.NOREFF = Mobile
+        if (MetodeBayarHelper::isMobileNoreff($item->BILL_NOREFF ?? null)) {
+            return 'ANDROID';
+        }
+
+        // Data Pembayaran: label dari jurnal sccttran per baris (bukan status terakhir scctbill)
         return MetodeBayarHelper::resolveDisplayLabel(
-            $item->BILL_FIDBANK ?? $item->FIDBANK ?? null,
-            $item->BILL_NOREFF ?? null,
+            $item->FIDBANK ?? $item->BILL_FIDBANK ?? null,
+            $item->NOREFF ?? null,
             $metodeBayarMap
         );
     }
@@ -439,7 +445,7 @@ class RekapPenerimaanController extends Controller
                                 continue;
                             }
                             if (($filter[0] ?? null) === '_bank_filter') {
-                                MetodeBayarHelper::applyBankFilter($query, $filter[2] ?? null, 'scctbill.FIDBANK');
+                                MetodeBayarHelper::applyBankFilter($query, $filter[2] ?? null, 'sccttran.FIDBANK');
                                 continue;
                             }
                             if (($filter[0] ?? null) === '_android_bill') {
@@ -696,7 +702,7 @@ class RekapPenerimaanController extends Controller
                             continue;
                         }
                         if (($filter[0] ?? null) === '_bank_filter') {
-                            MetodeBayarHelper::applyBankFilter($query, $filter[2] ?? null, 'scctbill.FIDBANK');
+                            MetodeBayarHelper::applyBankFilter($query, $filter[2] ?? null, 'sccttran.FIDBANK');
                             continue;
                         }
                         if (($filter[0] ?? null) === '_android_bill') {

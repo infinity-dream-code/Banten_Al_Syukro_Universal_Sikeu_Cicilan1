@@ -158,10 +158,16 @@ class MetodeBayarHelper
             return self::applyAndroidBankFilter($query, $tranAlias, $billAlias);
         }
 
+        // Kolom NOREFF mengikuti sumber FIDBANK (sccttran untuk Data Pembayaran, scctbill untuk Tagihan Lunas)
+        $fidTable = str_contains($fidColumn, '.')
+            ? explode('.', $fidColumn)[0]
+            : $billAlias;
+        $noreffColumn = "{$fidTable}.NOREFF";
+
         $customName = self::parseCustomBankFilter($bank);
         if ($customName !== null) {
-            $query->where("{$billAlias}.FIDBANK", self::LAIN_FIDBANK)
-                ->whereRaw('UPPER(TRIM(COALESCE(' . $billAlias . '.NOREFF, ""))) = ?', [strtoupper($customName)]);
+            $query->where($fidColumn, self::LAIN_FIDBANK)
+                ->whereRaw('UPPER(TRIM(COALESCE(' . $noreffColumn . ', ""))) = ?', [strtoupper($customName)]);
 
             return self::excludeMobileNoreff($query, $tranAlias, $billAlias);
         }
@@ -169,12 +175,12 @@ class MetodeBayarHelper
         if (strcasecmp($bank, self::LAIN_BANK_VALUE) === 0) {
             $reserved = self::reservedNoreffs();
             $placeholders = implode(', ', array_fill(0, count($reserved), '?'));
-            $query->where("{$billAlias}.FIDBANK", self::LAIN_FIDBANK)
+            $query->where($fidColumn, self::LAIN_FIDBANK)
                 ->whereRaw(
-                    'UPPER(TRIM(COALESCE(' . $billAlias . '.NOREFF, ""))) NOT IN (' . $placeholders . ')',
+                    'UPPER(TRIM(COALESCE(' . $noreffColumn . ', ""))) NOT IN (' . $placeholders . ')',
                     $reserved
                 )
-                ->whereRaw('TRIM(COALESCE(' . $billAlias . '.NOREFF, "")) <> ""');
+                ->whereRaw('TRIM(COALESCE(' . $noreffColumn . ', "")) <> ""');
 
             return self::excludeMobileNoreff($query, $tranAlias, $billAlias);
         }
@@ -183,10 +189,10 @@ class MetodeBayarHelper
             $reserved = self::reservedNoreffs();
             $placeholders = implode(', ', array_fill(0, count($reserved), '?'));
             $query->where($fidColumn, self::LAIN_FIDBANK)
-                ->where(function ($q) use ($billAlias, $placeholders, $reserved) {
-                    $q->whereRaw('TRIM(COALESCE(' . $billAlias . '.NOREFF, "")) = ""')
+                ->where(function ($q) use ($noreffColumn, $placeholders, $reserved) {
+                    $q->whereRaw('TRIM(COALESCE(' . $noreffColumn . ', "")) = ""')
                         ->orWhereRaw(
-                            'UPPER(TRIM(COALESCE(' . $billAlias . '.NOREFF, ""))) IN (' . $placeholders . ')',
+                            'UPPER(TRIM(COALESCE(' . $noreffColumn . ', ""))) IN (' . $placeholders . ')',
                             $reserved
                         );
                 });
