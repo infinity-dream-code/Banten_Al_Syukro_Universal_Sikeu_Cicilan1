@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Keuangan\PenerimaanSiswa;
 use App\Http\Controllers\Controller;
 use App\Support\PerNisMatrixPdf;
 use App\Support\MetodeBayarHelper;
+use App\Support\PeriodeHelper;
 use App\Models\mst_kelas;
 use App\Models\mst_tagihan;
 use App\Models\mst_thn_aka;
@@ -167,6 +168,7 @@ class RekapPenerimaanController extends Controller
         $item->PAIDDT = $item->TRXDATE;
         $item->BILLAM = $this->resolveNominalAmount($item);
         $item->BILLNM = $item->BILLNM ?? $item->BILLTARGET ?? (strtoupper(trim((string) ($item->METODE ?? ''))) === 'TOP UP' ? 'TOP UP' : '-');
+        $item->PERIODE = PeriodeHelper::label($this->resolvePeriode($item));
         $item->METODE_BAYAR = $this->resolveMetodeLabel($item, $metodeBayarMap);
         $item->REMARK = trim((string) ($item->METODE ?? '')) ?: '-';
         $item->NOREFF = trim((string) ($item->NOREFF ?? '')) ?: '-';
@@ -188,6 +190,7 @@ class RekapPenerimaanController extends Controller
         return match ($column) {
             'BILLAC', 'BTA', 'FUrutan', 'PAIDST', 'BILLCD' => "scctbill.{$column}",
             'BILLNM', 'NamaAkun' => 'scctbill.BILLNM',
+            'PERIODE' => 'scctbill.BILLAC',
             'BILLAM', 'DEBET' => 'sccttran.DEBET',
             'PAIDDT', 'TRXDATE' => 'sccttran.TRXDATE',
             'METODE_BAYAR', 'FIDBANK' => 'sccttran.FIDBANK',
@@ -214,6 +217,7 @@ class RekapPenerimaanController extends Controller
             ['data' => 'CODE02', 'name' => 'Unit', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'BILLAM', 'name' => 'Nominal', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end', 'exportable' => true],
             ['data' => 'BILLNM', 'name' => 'Nama Tagihan', 'searchable' => true, 'orderable' => true, 'exportable' => true],
+            ['data' => 'PERIODE', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'METODE_BAYAR', 'name' => 'Metode Bayar', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'REMARK', 'name' => 'Remark', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'NOREFF', 'name' => 'No Ref', 'searchable' => true, 'orderable' => true, 'exportable' => true],

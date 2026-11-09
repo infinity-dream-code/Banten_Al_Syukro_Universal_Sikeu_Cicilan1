@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Support\CacheHandler;
 use App\Support\FilterHandler;
 use App\Support\MetodeBayarHelper;
+use App\Support\PeriodeHelper;
 use App\Support\TagihanPaymentReversal;
 use Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -127,6 +128,7 @@ class DataPenerimaanController extends Controller
             ['data' => 'DESC02', 'name' => 'Kelas', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'DESC03', 'name' => 'Kelompok', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'BILLNM', 'name' => 'Nama Tagihan', 'searchable' => true, 'orderable' => true, 'exportable' => true],
+            ['data' => 'PERIODE', 'name' => 'Periode', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'BILLAM', 'name' => 'Nominal Bayar', 'searchable' => true, 'orderable' => true, 'columnType' => 'currency', 'className' => 'text-end', 'exportable' => true],
             ['data' => 'FIDBANK', 'name' => 'Metode', 'columnType' => 'custom_code_tagihan', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'PAIDDT', 'name' => 'Tanggal Bayar', 'columnType' => 'timestamp', 'searchable' => true, 'orderable' => true, 'exportable' => true],
@@ -369,6 +371,7 @@ class DataPenerimaanController extends Controller
                 $item->item_id = $billId;
                 $item->TRAN_URUT = null;
                 $item->BILLAM = $nominalBayar;
+                $item->PERIODE = PeriodeHelper::label($item->BILLAC ?? null);
                 $item->BILL_NOREFF = $billNoreff;
                 $item->FIDBANK = MetodeBayarHelper::resolveDisplayFidBank(
                     $item->FIDBANK ?? null,
@@ -391,7 +394,7 @@ class DataPenerimaanController extends Controller
             "data" => $records ?? [],
             "totals" => [
                 "billam" => [
-                    "location" => 8,
+                    "location" => 9,
                     "value" => $totalNominal,
                     "columnType" => "currency",
                 ],
@@ -572,6 +575,7 @@ class DataPenerimaanController extends Controller
             'DESC02' => 'scctcust.DESC02',
             'DESC03' => 'scctcust.DESC03',
             'BILLNM' => 'scctbill.BILLNM',
+            'PERIODE' => 'scctbill.BILLAC',
             'BILLAM' => 'scctbill.BILLPAID',
             'FIDBANK' => 'scctbill.FIDBANK',
             'PAIDDT' => 'scctbill.PAIDDT',
