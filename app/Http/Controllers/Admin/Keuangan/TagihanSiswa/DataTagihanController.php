@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\Keuangan\TagihanSiswa;
 
 use App\Http\Controllers\Controller;
+use App\Models\LogWhatsapp;
 use App\Models\mst_kelas;
 use App\Models\mst_sekolah;
 use App\Models\mst_tagihan;
@@ -16,14 +17,20 @@ use App\Support\CacheHandler;
 use App\Support\FilterHandler;
 use App\Support\PeriodeHelper;
 use App\Support\TagihanPaymentReversal;
+use App\Support\WhatsappGateway;
+use App\Support\WhatsappTagihan;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Throwable;
 
 class DataTagihanController extends Controller
 {
@@ -176,6 +183,22 @@ class DataTagihanController extends Controller
                 'buttonClass' => 'btn btn-sm btn-success btn-kuitansi',
                 'buttonLink' => '#',
                 'buttonIcon' => 'ri-printer-line me-2',
+                'exportable' => false,
+                'duplicate' => false,
+            ],
+            [
+                'data' => 'kirim_wa',
+                'name' => 'Kirim WA',
+                'orderable' => false,
+                'dataVal' => false,
+                'columnType' => 'button',
+                'className' => 'text-center exclude-selection',
+                'excludeFromSelection' => true,
+                'button' => 'action',
+                'buttonText' => 'Kirim WA',
+                'buttonClass' => 'btn btn-sm btn-whatsapp btn-kirim-wa',
+                'buttonLink' => '#',
+                'buttonIcon' => 'ri-whatsapp-line me-2',
                 'exportable' => false,
                 'duplicate' => false,
             ],
@@ -566,6 +589,207 @@ class DataTagihanController extends Controller
         }
     }
 
+    public function sendWa(Request $request): JsonResponse
+    {
+        set_time_limit(500);
+
+        $validator = Validator::make($request->all(), [
+            'tagihan' => ['required', 'array', 'min:1'],
+        ], [], [
+            'tagihan' => 'Tagihan',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'error' => $validator->errors(),
+            ], 422);
+        }
+
+        $grouped = $this->normalizeWaTagihan($request->input('tagihan', []));
+        if ($grouped === []) {
+            return response()->json(['message' => 'Tidak ada data yang dipilih.'], 422);
+        }
+
+        $maxRecipients = max(1, (int) config('whatsapp.max_recipients', 100));
+        if (count($grouped) > $maxRecipients) {
+            return response()->json([
+                'message' => "Jumlah siswa yang dipilih tidak boleh lebih dari {$maxRecipients}.",
+            ], 413);
+        }
+
+        try {
+            $this->ensureLogWhatsappsTable();
+        } catch (Throwable $e) {
+            Log::channel('whatsapp')->error('ensure log_whatsapps failed', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'message' => 'Tabel log WhatsApp belum siap. Jalankan database/sql/log_whatsapps.sql.',
+                'error' => $e->getMessage(),
+            ], 503);
+        }
+
+        $queued = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        foreach ($grouped as $custId => $billIds) {
+            try {
+                $siswa = scctcust::query()
+                    ->select(['CUSTID', 'NO_WA', 'NMCUST', 'NOCUST', 'GENUS'])
+                    ->where('CUSTID', $custId)
+                    ->first();
+
+                if (!$siswa) {
+                    $skipped++;
+                    continue;
+                }
+
+                $phone = WhatsappTagihan::formatPhoneGateway($siswa->NO_WA ?? null);
+                if ($phone === null) {
+                    $skipped++;
+                    continue;
+                }
+
+                $billsQuery = scctbill::query()
+                    ->where('CUSTID', $custId)
+                    ->whereIn('AA', $billIds)
+                    ->where('FSTSBolehBayar', 1);
+                $this->applyBelumLunasScope($billsQuery);
+                $bills = $billsQuery->get([
+                    'AA', 'BILLNM', 'BILLAC', 'BILLAM', 'BILLPAID', 'PAYMENTLEFT', 'PAIDST',
+                ]);
+
+                if ($bills->isEmpty()) {
+                    $skipped++;
+                    continue;
+                }
+
+                $totalSisa = 0;
+                foreach ($bills as $bill) {
+                    $amounts = WhatsappTagihan::amounts(
+                        $bill->BILLAM,
+                        $bill->BILLPAID,
+                        $bill->PAYMENTLEFT,
+                        $bill->PAIDST
+                    );
+                    $totalSisa += $amounts['sisa'];
+                }
+
+                $message = WhatsappTagihan::applyTemplate(WhatsappTagihan::pickTemplate(), [
+                    'nama_anak' => $siswa->NMCUST ?? '',
+                    'nama_orang_tua' => $siswa->GENUS ?? '',
+                    'jumlah_tagihan' => 'Rp *' . WhatsappTagihan::formatRupiah($totalSisa) . '*',
+                    'rincian' => WhatsappTagihan::rincian($bills),
+                ]);
+
+                $client = WhatsappGateway::nextClientId();
+                $log = LogWhatsapp::create([
+                    'custid' => (string) $siswa->CUSTID,
+                    'log_id' => 0,
+                    'user_id' => Auth::id(),
+                    'status' => 0,
+                    'no_wa' => $phone,
+                    'pesan' => $message,
+                    'nama' => $siswa->NMCUST,
+                    'response' => '',
+                    'client' => $client,
+                ]);
+
+                WhatsappGateway::enqueue($phone, $message, $log->id, $client);
+                $queued++;
+            } catch (Throwable $e) {
+                $failed++;
+                Log::channel('whatsapp')->error('kirim wa tagihan gagal', [
+                    'custid' => $custId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($queued === 0) {
+            $status = $failed > 0 ? 503 : 422;
+            $message = $failed > 0
+                ? 'Gagal mengantrekan pesan WhatsApp. Periksa koneksi gateway / WA_CLIENT_ID.'
+                : 'Tidak ada pesan yang dikirim. Pastikan No WA siswa sudah diisi.';
+
+            return response()->json([
+                'message' => $message,
+                'queued' => $queued,
+                'skipped' => $skipped,
+                'failed' => $failed,
+            ], $status);
+        }
+
+        return response()->json([
+            'message' => $queued . ' pesan masuk antrian WhatsApp (round-robin).',
+            'queued' => $queued,
+            'skipped' => $skipped,
+            'failed' => $failed,
+        ]);
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function normalizeWaTagihan(array $tagihan): array
+    {
+        $grouped = [];
+
+        foreach ($tagihan as $custId => $billIds) {
+            $custKey = trim((string) $custId);
+            if ($custKey === '') {
+                continue;
+            }
+
+            $ids = is_array($billIds) ? $billIds : [$billIds];
+            $clean = [];
+            foreach ($ids as $id) {
+                $aa = trim((string) $id);
+                if ($aa !== '') {
+                    $clean[] = $aa;
+                }
+            }
+            $clean = array_values(array_unique($clean));
+            if ($clean === []) {
+                continue;
+            }
+
+            $grouped[$custKey] = $clean;
+        }
+
+        return $grouped;
+    }
+
+    private function ensureLogWhatsappsTable(): void
+    {
+        if (Schema::hasTable('log_whatsapps')) {
+            if (!Schema::hasColumn('log_whatsapps', 'client')) {
+                Schema::table('log_whatsapps', function ($table) {
+                    $table->string('client', 20)->nullable()->after('response');
+                });
+            }
+
+            return;
+        }
+
+        Schema::create('log_whatsapps', function ($table) {
+            $table->id();
+            $table->integer('status')->default(0);
+            $table->integer('log_id')->default(0);
+            $table->integer('user_id')->nullable();
+            $table->string('custid', 50)->nullable();
+            $table->string('nama', 255)->nullable();
+            $table->string('no_wa', 30)->nullable();
+            $table->longText('pesan')->nullable();
+            $table->longText('response')->nullable();
+            $table->string('client', 20)->nullable();
+            $table->timestamps();
+            $table->index('custid', 'idx_log_whatsapps_custid');
+            $table->index('created_at', 'idx_log_whatsapps_created');
+        });
+    }
+
     public function getData(Request $request)
     {
         try {
@@ -596,7 +820,7 @@ class DataTagihanController extends Controller
         $columnName = 'scctbill.FUrutan';
         $columnSortOrder = 'asc';
         $userOrdered = false;
-        $nonSortableData = ['AA', 'naik', 'turun', 'delete', 'hapus', 'print', 'kuitansi', 'NOVA', 'detail_trx'];
+        $nonSortableData = ['AA', 'naik', 'turun', 'delete', 'hapus', 'print', 'kuitansi', 'kirim_wa', 'NOVA', 'detail_trx'];
 
         if (!empty($order_arr)) {
             $columnIndex = $columnIndex_arr[0]['column'] ?? null;
@@ -655,6 +879,7 @@ class DataTagihanController extends Controller
             'scctcust.CODE02',
             'scctcust.DESC02',
             'scctcust.DESC03',
+            'scctcust.NO_WA',
             'scctbill.AA',
             'scctbill.BILLNM',
             'scctbill.BILLAC',
@@ -774,6 +999,8 @@ class DataTagihanController extends Controller
                 $paidDtDisplay = $this->resolvePaidDateDisplay($paidDtRaw, $billPaid, $aa, $lastPaymentDates);
 
                 $canHapus = $this->canHapusTagihan($item);
+                $noWa = trim((string) ($get('NO_WA') ?? ''));
+                $hasWa = WhatsappTagihan::formatPhone($noWa) !== null;
 
                 return [
                     'AA' => $get('AA'),
@@ -786,6 +1013,8 @@ class DataTagihanController extends Controller
                     'CODE02' => $get('CODE02'),
                     'DESC02' => $get('DESC02'),
                     'DESC03' => $get('DESC03'),
+                    'NO_WA' => $noWa !== '' ? $noWa : null,
+                    'has_wa' => $hasWa,
                     'BILLNM' => $get('BILLNM'),
                     'BILLAM_TOTAL' => $get('BILLAM'),
                     'BILLAM' => $get('PAYMENTLEFT'),
@@ -807,6 +1036,7 @@ class DataTagihanController extends Controller
                     'BILL_TRANSNO' => $get('BILL_TRANSNO'),
                     'print' => true,
                     'kuitansi' => $billPaid > 0,
+                    'kirim_wa' => true,
                     'delete' => $billPaid > 0,
                     'delete_label' => 'Reversal',
                     'hapus' => $canHapus,

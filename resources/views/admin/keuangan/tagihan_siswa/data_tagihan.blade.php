@@ -234,6 +234,10 @@
                                 <span class="ri-printer-line me-2"></span>
                                 Cetak Kuitansi
                             </button>
+                            <button type="button" class="btn btn-whatsapp" id="btn-kirim-wa-massal">
+                                <span class="ri-whatsapp-line me-2"></span>
+                                Kirim WA Massal
+                            </button>
                             <button type="button" class="btn btn-google-plus btn-print-rekap">
                                 <span class="ri-file-pdf-2-line me-2"></span>
                                 Cetak Rekap
@@ -833,6 +837,64 @@
             updateUrutanToolbarState();
         }
 
+        function buildWaPayloadFromRows(rows) {
+            const payload = {};
+            (rows || []).forEach((row) => {
+                const custId = String(row?.CUSTID ?? '').trim();
+                const billId = String(row?.item_id ?? row?.AA ?? '').trim();
+                if (!custId || !billId) {
+                    return;
+                }
+                if (!payload[custId]) {
+                    payload[custId] = [];
+                }
+                if (!payload[custId].includes(billId)) {
+                    payload[custId].push(billId);
+                }
+            });
+            return payload;
+        }
+
+        function currentCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                || '{{ csrf_token() }}';
+        }
+
+        function sendWaTagihan(tagihanPayload, label) {
+            const keys = Object.keys(tagihanPayload || {});
+            if (keys.length === 0) {
+                warningAlert('Tidak ada tagihan yang dipilih.');
+                return;
+            }
+
+            loadingAlert(`Mengirim WhatsApp ${label || ''}<br><span class="text-danger">*</span> Jangan menutup atau memuat ulang halaman!`);
+
+            fetch(@json(route('admin.keuangan.tagihan-siswa.data-tagihan.send-wa')), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': currentCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ tagihan: tagihanPayload }),
+            })
+                .then(async (response) => {
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw { status: response.status, message: data.message || response.statusText };
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    successAlert(data.message || 'Pesan WhatsApp masuk antrian.');
+                })
+                .catch((error) => {
+                    errorAlert(error.message || 'Gagal mengirim WhatsApp.');
+                });
+        }
+
         document.querySelector('#main_table tbody').addEventListener('click', function (e) {
             if (e.target.closest('.btn-kuitansi')) {
                 const rowEl = e.target.closest('tr');
@@ -840,6 +902,24 @@
                     const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
                     window.generateKuitansiFromRows(rowData ? [rowData] : []);
                 }
+                return;
+            }
+            if (e.target.closest('.btn-kirim-wa')) {
+                const rowEl = e.target.closest('tr');
+                if (!rowEl) return;
+                const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
+                if (!rowData) {
+                    warningAlert('Data baris tidak ditemukan.');
+                    return;
+                }
+                if (!rowData.has_wa) {
+                    warningAlert('Nomor WhatsApp siswa belum diisi. Lengkapi No WA di Data Siswa.');
+                    return;
+                }
+                if (!confirm(`Kirim notifikasi WA untuk tagihan "${rowData.BILLNM || '-'}" atas nama ${rowData.NMCUST || '-'}?`)) {
+                    return;
+                }
+                sendWaTagihan(buildWaPayloadFromRows([rowData]), 'per tagihan');
                 return;
             }
             if (e.target.closest('.btn-reversal')) {
@@ -862,6 +942,31 @@
                     }
                 }
             }
+        });
+
+        document.getElementById('btn-kirim-wa-massal')?.addEventListener('click', function () {
+            const selected = getSelectedTagihanRows();
+            if (!selected.length) {
+                warningAlert('Pilih minimal 1 tagihan terlebih dahulu.');
+                return;
+            }
+
+            const withWa = selected.filter((row) => row.has_wa);
+            const withoutWa = selected.length - withWa.length;
+            if (!withWa.length) {
+                warningAlert('Semua tagihan terpilih belum punya No WA. Lengkapi di Data Siswa.');
+                return;
+            }
+
+            let confirmMsg = `Kirim notifikasi WA untuk ${withWa.length} tagihan terpilih?`;
+            if (withoutWa > 0) {
+                confirmMsg += `\n\n${withoutWa} tagihan dilewati karena No WA kosong.`;
+            }
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            sendWaTagihan(buildWaPayloadFromRows(withWa), 'massal');
         });
 
         $(document).on('click', '#main_table tbody .btn-detail-trx', async function (e) {
