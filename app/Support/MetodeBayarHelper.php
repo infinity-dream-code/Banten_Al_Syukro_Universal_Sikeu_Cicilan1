@@ -139,6 +139,38 @@ class MetodeBayarHelper
     }
 
     /**
+     * Filter bank multi-select (OR). Satu nilai tetap didukung.
+     *
+     * @param  Builder|QueryBuilder  $query
+     * @param  string|array<int, string>|null  $banks
+     * @return Builder|QueryBuilder
+     */
+    public static function applyBankFilters($query, string|array|null $banks, string $fidColumn, string $tranAlias = 'sccttran', string $billAlias = 'scctbill')
+    {
+        $list = is_array($banks) ? $banks : [$banks];
+        $list = array_values(array_filter(array_map(
+            static fn ($item) => trim((string) $item),
+            $list
+        ), static fn ($item) => $item !== '' && strtolower($item) !== 'all'));
+
+        if ($list === []) {
+            return $query;
+        }
+
+        if (count($list) === 1) {
+            return self::applyBankFilter($query, $list[0], $fidColumn, $tranAlias, $billAlias);
+        }
+
+        return $query->where(function ($outer) use ($list, $fidColumn, $tranAlias, $billAlias) {
+            foreach ($list as $bank) {
+                $outer->orWhere(function ($q) use ($bank, $fidColumn, $tranAlias, $billAlias) {
+                    self::applyBankFilter($q, $bank, $fidColumn, $tranAlias, $billAlias);
+                });
+            }
+        });
+    }
+
+    /**
      * Filter berdasarkan pilihan bank dropdown.
      * - 6 / ANDROID
      * - topup → sccttran.METODE = FROM INVOICE (bayar otomatis dari VA)

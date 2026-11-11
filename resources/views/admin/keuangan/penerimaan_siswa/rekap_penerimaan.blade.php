@@ -111,8 +111,11 @@
                                 <label class="form-label" for="filter[bank]">
                                     Bank
                                 </label>
-                                <select class="form-select" id="filter[bank]" name="filter[bank]"
-                                        data-control="select2" data-placeholder="Pilih bank">
+                                <select class="form-select" id="filter[bank]"
+                                        name="filter[bank][]"
+                                        data-control="select2"
+                                        data-placeholder="Pilih bank"
+                                        multiple="multiple">
                                     <option value="all">Semua</option>
                                     @isset($bank)
                                         @foreach($bank as $key => $item)
@@ -455,6 +458,25 @@
             $namaTagihanInput.on('select2:unselect', function (e) {
                 if (e.params.data.id === 'all') {
                     $namaTagihanInput.val(null).trigger('change.select2');
+                }
+            });
+
+            const $bankInput = $('#filter\\[bank\\]');
+            $bankInput.on('select2:select', function (e) {
+                if (e.params.data.id === 'all') {
+                    $bankInput.val(['all']).trigger('change.select2');
+                    return;
+                }
+
+                const selected = $bankInput.val() || [];
+                if (selected.includes('all') && selected.length > 1) {
+                    $bankInput.val(selected.filter(item => item !== 'all')).trigger('change.select2');
+                }
+            });
+
+            $bankInput.on('select2:unselect', function (e) {
+                if (e.params.data.id === 'all') {
+                    $bankInput.val(null).trigger('change.select2');
                 }
             });
 

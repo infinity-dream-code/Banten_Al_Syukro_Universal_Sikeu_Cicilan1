@@ -427,7 +427,17 @@ class RekapPenerimaanController extends Controller
                         } else if ($key === 'unit') {
                             $filters[] = ['_sekolah', '=', $val];
                         } elseif ($key === 'bank') {
-                            $filters[] = ['_bank_filter', '=', (string) $val];
+                            if (is_array($val)) {
+                                $array = array_values(array_filter(
+                                    $val,
+                                    fn ($item) => !is_null($item) && $item !== '' && strtolower((string) $item) !== 'all'
+                                ));
+                                if (!empty($array)) {
+                                    $filters[] = ['_bank_filter', '=', $array];
+                                }
+                            } else {
+                                $filters[] = ['_bank_filter', '=', (string) $val];
+                            }
                         } else {
                             ($colName) && $filters[] = [$colName, '=', $val];
                         }
@@ -451,7 +461,7 @@ class RekapPenerimaanController extends Controller
                                 continue;
                             }
                             if (($filter[0] ?? null) === '_bank_filter') {
-                                MetodeBayarHelper::applyBankFilter($query, $filter[2] ?? null, 'sccttran.FIDBANK');
+                                MetodeBayarHelper::applyBankFilters($query, $filter[2] ?? null, 'sccttran.FIDBANK');
                                 continue;
                             }
                             if (($filter[0] ?? null) === '_android_bill') {
@@ -671,7 +681,17 @@ class RekapPenerimaanController extends Controller
                         $val = '%' . $val . '%';
                         ($colName) && $filters[] = [$colName, 'like', $val];
                     } elseif ($key === 'bank') {
-                        $filters[] = ['_bank_filter', '=', (string) $val];
+                        if (is_array($val)) {
+                            $array = array_values(array_filter(
+                                $val,
+                                fn ($item) => !is_null($item) && $item !== '' && strtolower((string) $item) !== 'all'
+                            ));
+                            if (!empty($array)) {
+                                $filters[] = ['_bank_filter', '=', $array];
+                            }
+                        } else {
+                            $filters[] = ['_bank_filter', '=', (string) $val];
+                        }
                     } else {
                         ($colName) && $filters[] = [$colName, '=', $val];
                     }
@@ -708,7 +728,7 @@ class RekapPenerimaanController extends Controller
                             continue;
                         }
                         if (($filter[0] ?? null) === '_bank_filter') {
-                            MetodeBayarHelper::applyBankFilter($query, $filter[2] ?? null, 'sccttran.FIDBANK');
+                            MetodeBayarHelper::applyBankFilters($query, $filter[2] ?? null, 'sccttran.FIDBANK');
                             continue;
                         }
                         if (($filter[0] ?? null) === '_android_bill') {
