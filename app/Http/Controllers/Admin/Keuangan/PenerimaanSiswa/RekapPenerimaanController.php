@@ -249,6 +249,7 @@ class RekapPenerimaanController extends Controller
             '1140002' => 'Manual SALDO',
             '1140001' => 'Manual BCAS',
             '1140003' => 'Transfer Bank Lain',
+            MetodeBayarHelper::TOPUP_FILTER_VALUE => 'Top Up',
             '6' => 'ANDROID',
         ]);
 

@@ -13,6 +13,8 @@ class MetodeBayarHelper
     /** Transfer Bank Lain / Lain-lain (nama bank bebas disimpan di NOREFF). */
     public const LAIN_FIDBANK = '1140003';
     public const LAIN_BANK_VALUE = 'lain';
+    /** Filter Top Up = bayar tagihan otomatis dari saldo VA (sccttran.METODE = FROM INVOICE). */
+    public const TOPUP_FILTER_VALUE = 'topup';
 
     /** NOREFF sistem — bukan nama bank bebas. */
     public static function reservedNoreffs(): array
@@ -139,10 +141,13 @@ class MetodeBayarHelper
     /**
      * Filter berdasarkan pilihan bank dropdown.
      * - 6 / ANDROID
-     * - lain → 1140003 + NOREFF nama bebas
-     * - custom:BSI → 1140003 + NOREFF = BSI
-     * - 1140003 → Transfer Bank Lain generik (tanpa nama bebas)
+     * - topup → sccttran.METODE = FROM INVOICE (bayar otomatis dari VA)
+     * - lain → 1140003 + scctbill.NOREFF nama bebas
+     * - custom:BSI → 1140003 + scctbill.NOREFF = BSI
+     * - 1140003 → Transfer Bank Lain generik (tanpa nama bebas di bill)
      * - kode lain → FIDBANK biasa
+     *
+     * Nama bank bebas selalu dari scctbill.NOREFF (bukan sccttran.NOREFF / no ref).
      *
      * @param  Builder|QueryBuilder  $query
      * @return Builder|QueryBuilder
@@ -158,11 +163,15 @@ class MetodeBayarHelper
             return self::applyAndroidBankFilter($query, $tranAlias, $billAlias);
         }
 
-        // Kolom NOREFF mengikuti sumber FIDBANK (sccttran untuk Data Pembayaran, scctbill untuk Tagihan Lunas)
-        $fidTable = str_contains($fidColumn, '.')
-            ? explode('.', $fidColumn)[0]
-            : $billAlias;
-        $noreffColumn = "{$fidTable}.NOREFF";
+        if (strcasecmp($bank, self::TOPUP_FILTER_VALUE) === 0) {
+            return $query->whereRaw(
+                'UPPER(TRIM(COALESCE(' . $tranAlias . '.METODE, ""))) = ?',
+                ['FROM INVOICE']
+            );
+        }
+
+        // Nama bank bebas / Transfer Bank Lain generik: selalu scctbill.NOREFF
+        $noreffColumn = "{$billAlias}.NOREFF";
 
         $customName = self::parseCustomBankFilter($bank);
         if ($customName !== null) {
