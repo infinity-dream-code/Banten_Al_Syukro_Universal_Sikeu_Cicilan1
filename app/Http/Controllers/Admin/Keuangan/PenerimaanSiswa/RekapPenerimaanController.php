@@ -122,10 +122,11 @@ class RekapPenerimaanController extends Controller
             return 'ANDROID';
         }
 
-        // Data Pembayaran: label dari jurnal sccttran per baris (bukan status terakhir scctbill)
+        // FIDBANK dari jurnal sccttran; nama bank bebas dari scctbill.NOREFF (sama Tagihan Lunas).
+        // Jangan pakai sccttran.NOREFF — itu no ref bayar (mis. 2026/I10-2(711)).
         return MetodeBayarHelper::resolveDisplayLabel(
             $item->FIDBANK ?? $item->BILL_FIDBANK ?? null,
-            $item->NOREFF ?? null,
+            $item->BILL_NOREFF ?? null,
             $metodeBayarMap
         );
     }
