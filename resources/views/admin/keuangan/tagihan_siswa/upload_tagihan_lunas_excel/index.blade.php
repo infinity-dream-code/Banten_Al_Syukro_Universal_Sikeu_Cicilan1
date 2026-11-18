@@ -158,7 +158,7 @@
                             <li class="list-group-item list-group-timeline-danger">Nama tagihan harus ada di Master Tagihan (contoh: SPP).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
-                                   href="{{asset('TEMPLATE Input Tagihan Lunas.xlsx')}}?v=20261118-nodaf"
+                                   href="{{asset('TEMPLATE Input Tagihan Lunas.xlsx')}}?v=20261118-nodaf-2"
                                    download>
                                     <i class="ri ri-file-excel-line me-2"></i>Template Input Tagihan Lunas
                                 </a>
