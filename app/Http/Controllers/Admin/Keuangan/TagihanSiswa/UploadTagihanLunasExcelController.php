@@ -6,6 +6,7 @@ use App\Imports\Keuangan\TagihanSiswa\ImportTagihanLunasExcel;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
+use App\Support\MetodeBayarHelper;
 use App\Support\PeriodeHelper;
 use App\Support\SchoolScope;
 use Carbon\Carbon;
@@ -74,7 +75,14 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
         $metodeBayar = (new scctbill())->metodeBayar;
         $records = collect($cachedData)->map(function ($item) use ($metodeBayar) {
             $fid = (string) ($item['fidbank'] ?? '');
-            $bankLabel = $metodeBayar[$fid] ?? ($item['bank'] ?? '-');
+            $bankRaw = trim((string) ($item['bank'] ?? ''));
+            $bankKey = strtolower(preg_replace('/\s+/', ' ', $bankRaw));
+            $knownAliases = ['', 'transfer', 'transfer bank lain', '1140003', 'bcas', 'cash', 'saldo', 'tunai', 'bmi'];
+            if ($fid === MetodeBayarHelper::LAIN_FIDBANK && $bankRaw !== '' && !in_array($bankKey, $knownAliases, true)) {
+                $bankLabel = $bankRaw;
+            } else {
+                $bankLabel = $metodeBayar[$fid] ?? ($bankRaw !== '' ? $bankRaw : '-');
+            }
 
             return [
                 'nis' => $item['nis'] ?? null,
@@ -280,6 +288,21 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                 $urut = $tagihanSiswaTerbaru ? $tagihanSiswaTerbaru['FUrutan'] + 1 : 1;
                 $billCD = date('Y') . '/i' . date('m') . '-' . ($urut + 1);
 
+                $fidBank = trim((string) ($item['fidbank'] ?? ''));
+                if ($fidBank === '') {
+                    $fidBank = '1140001';
+                }
+
+                $bankRaw = trim((string) ($item['bank'] ?? ''));
+                $bankKey = strtolower(preg_replace('/\s+/', ' ', $bankRaw));
+                $noreff = 'TELLER';
+                if ($fidBank === MetodeBayarHelper::LAIN_FIDBANK) {
+                    $knownGeneric = ['', 'transfer', 'transfer bank lain', '1140003'];
+                    $noreff = ($bankRaw !== '' && !in_array($bankKey, $knownGeneric, true))
+                        ? $bankRaw
+                        : 'TELLER';
+                }
+
                 DB::connection('DATA_MYSQL')->table('scctbill')->insert([
                     'CUSTID' => $siswa->CUSTID,
                     'BILLAC' => $bta,
@@ -290,8 +313,8 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
                     'PAIDST' => 1,
                     'PAIDDT' => $tanggalBayar,
                     'PAIDDT_ACTUAL' => now(),
-                    'FIDBANK' => '1140001',
-                    'NOREFF' => 'TELLER',
+                    'FIDBANK' => $fidBank,
+                    'NOREFF' => $noreff,
                     'FUrutan' => $urut,
                     'FTGLTagihan' => now(),
                     'FSTSBolehBayar' => 1,

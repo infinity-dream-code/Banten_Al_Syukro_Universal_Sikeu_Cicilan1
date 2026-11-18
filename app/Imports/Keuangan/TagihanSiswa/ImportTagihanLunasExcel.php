@@ -126,7 +126,7 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
             $rowData['billac'] = PeriodeHelper::fromLabel($rowData['periode']);
             if (!$rowData['billac']) {
                 $rowData['status'] = 0;
-                $statusKet[] = 'Periode tidak valid (contoh: Juli 2026)';
+                $statusKet[] = 'Periode tidak valid (contoh: Juli 2026 atau 2027/2028)';
             }
 
             if ($rowData['nominal'] === null || (int) $rowData['nominal'] <= 0) {
@@ -145,7 +145,7 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
             $rowData['fidbank'] = $this->resolveBank($rowData['bank']);
             if (!$rowData['fidbank']) {
                 $rowData['status'] = 0;
-                $statusKet[] = 'Bank tidak dikenali (BCAS / Cash / Saldo / Transfer)';
+                $statusKet[] = 'Bank tidak dikenali (BCAS / Cash / Saldo / Transfer / nama bank lain seperti YPUU)';
             }
 
             $rowData['keterangan'] = $statusKet ? implode(', ', $statusKet) : null;
@@ -278,7 +278,12 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
             return '1140001';
         }
 
-        return self::BANK_ALIASES[$key] ?? null;
+        if (isset(self::BANK_ALIASES[$key])) {
+            return self::BANK_ALIASES[$key];
+        }
+
+        // Nama bank bebas (YPUU, BSI, dll) = Transfer Bank Lain
+        return '1140003';
     }
 
     public function headingRow(): int

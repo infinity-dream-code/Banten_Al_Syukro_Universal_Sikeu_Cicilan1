@@ -60,6 +60,11 @@ class PeriodeHelper
             return $raw;
         }
 
+        // Tahun akademik: 2027/2028 atau 2027-2028
+        if (preg_match('/^(\d{4})\s*[\/\-]\s*(\d{4})$/', $raw, $m)) {
+            return $m[1] . '/' . $m[2];
+        }
+
         if (preg_match('/^(\d{4})[\/\-](\d{1,2})$/', $raw, $m)) {
             $bulan = (int) $m[2];
             return ($bulan >= 1 && $bulan <= 12) ? sprintf('%04d%02d', (int) $m[1], $bulan) : null;
