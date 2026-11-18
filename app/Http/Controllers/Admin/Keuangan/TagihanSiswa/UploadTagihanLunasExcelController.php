@@ -51,6 +51,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
         return [
             ['data' => null, 'name' => 'no', 'className' => 'text-center', 'columnType' => 'row'],
             ['data' => 'nis', 'name' => 'NIS', 'searchable' => true, 'orderable' => true],
+            ['data' => 'nodaftar', 'name' => 'NODAF', 'searchable' => true, 'orderable' => true],
             ['data' => 'name', 'name' => 'Nama Siswa', 'searchable' => true, 'orderable' => true],
             ['data' => 'nama_tagihan', 'name' => 'Nama Tagihan', 'searchable' => true, 'orderable' => true],
             ['data' => 'periode', 'name' => 'Periode', 'searchable' => true, 'orderable' => true],
@@ -77,6 +78,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
 
             return [
                 'nis' => $item['nis'] ?? null,
+                'nodaftar' => $item['nodaftar'] ?? null,
                 'name' => $item['nama'] ?? null,
                 'nama_tagihan' => $item['billnm'] ?? $item['nama_tagihan'] ?? '-',
                 'periode' => PeriodeHelper::label($item['billac'] ?? $item['periode'] ?? ''),
@@ -116,7 +118,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
 
         try {
             $headingsData = (new HeadingRowImport)->toArray($file);
-            $requiredColumns = ['nis', 'nama_tagihan', 'periode', 'nominal', 'tanggal_bayar', 'bank'];
+            $requiredColumns = ['nama_tagihan', 'periode', 'nominal', 'tanggal_bayar', 'bank'];
             if (empty($headingsData) || !isset($headingsData[0][0])) {
                 throw new \Exception('Tidak dapat membaca judul kolom dari file. Pastikan file memiliki header yang sesuai.');
             }
@@ -130,6 +132,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
 
             $aliases = [
                 'nis' => ['nis'],
+                'nodaftar' => ['nodaftar', 'nodaf', 'no_daftar', 'no_pend', 'nopend', 'no_pendaftaran'],
                 'nama_tagihan' => ['nama_tagihan', 'namatagihan', 'tagihan'],
                 'periode' => ['periode'],
                 'nominal' => ['nominal', 'jumlah'],
@@ -138,6 +141,24 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
             ];
 
             $missingColumns = [];
+            $hasNis = false;
+            $hasNodaftar = false;
+            foreach ($aliases['nis'] as $alias) {
+                if (in_array($alias, $headings, true)) {
+                    $hasNis = true;
+                    break;
+                }
+            }
+            foreach ($aliases['nodaftar'] as $alias) {
+                if (in_array($alias, $headings, true)) {
+                    $hasNodaftar = true;
+                    break;
+                }
+            }
+            if (!$hasNis && !$hasNodaftar) {
+                $missingColumns[] = 'NIS / NODAF';
+            }
+
             foreach ($requiredColumns as $column) {
                 $found = false;
                 foreach ($aliases[$column] as $alias) {
@@ -154,7 +175,7 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
             if (!empty($missingColumns)) {
                 throw new \Exception(
                     'Kolom ' . implode(', ', $missingColumns) . ' tidak ditemukan.<br><hr>' .
-                    'Pastikan kolom berikut ada: <strong>NIS, NAMA TAGIHAN, PERIODE, NOMINAL, TANGGAL BAYAR, BANK</strong>.'
+                    'Pastikan kolom berikut ada: <strong>NIS atau NODAF, NAMA TAGIHAN, PERIODE, NOMINAL, TANGGAL BAYAR, BANK</strong>.'
                 );
             }
 
@@ -216,13 +237,31 @@ class UploadTagihanLunasExcelController extends UploadTagihanExcelController
             $insertedCount = 0;
 
             foreach ($validRows as $item) {
-                $siswa = scctcust::where('NOCUST', $item['nis']);
-                SchoolScope::apply($siswa, 'scctcust', $this->sekolah);
-                $siswa = $siswa->first();
+                $siswaQuery = scctcust::query();
+                SchoolScope::apply($siswaQuery, 'scctcust', $this->sekolah);
+
+                $custId = trim((string) ($item['custid'] ?? ''));
+                $nis = trim((string) ($item['nis'] ?? ''));
+                $nodaftar = trim((string) ($item['nodaftar'] ?? ''));
+
+                if ($custId !== '') {
+                    $siswaQuery->where('CUSTID', $custId);
+                } elseif ($nis !== '') {
+                    $siswaQuery->where('NOCUST', $nis);
+                } elseif ($nodaftar !== '') {
+                    $siswaQuery->where('NUM2ND', $nodaftar);
+                } else {
+                    DB::connection('DATA_MYSQL')->rollBack();
+                    DB::rollBack();
+                    return response()->json(['message' => 'Baris tanpa NIS/NODAF tidak dapat disimpan.'], 422);
+                }
+
+                $siswa = $siswaQuery->first();
                 if (!$siswa) {
                     DB::connection('DATA_MYSQL')->rollBack();
                     DB::rollBack();
-                    return response()->json(['message' => "siswa dengan nis: {$item['nis']} tidak ditemukan!"], 422);
+                    $label = $nis !== '' ? "NIS: {$nis}" : ($nodaftar !== '' ? "NODAF: {$nodaftar}" : "CUSTID: {$custId}");
+                    return response()->json(['message' => "Siswa dengan {$label} tidak ditemukan!"], 422);
                 }
                 if ((int) ($siswa->STCUST ?? 0) === 0) {
                     continue;

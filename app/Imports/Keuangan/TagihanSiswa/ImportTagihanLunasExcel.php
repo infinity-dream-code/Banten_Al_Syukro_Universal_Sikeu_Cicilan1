@@ -58,6 +58,7 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
             $rowData = $this->normalizeRow($row->toArray());
             if (
                 $rowData['nis'] === ''
+                && $rowData['nodaftar'] === ''
                 && $rowData['nama_tagihan'] === ''
                 && $rowData['nominal'] === null
             ) {
@@ -68,21 +69,43 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
             $statusKet = [];
 
             $siswa = null;
-            if ($rowData['nis'] === '') {
+            if ($rowData['nis'] === '' && $rowData['nodaftar'] === '') {
                 $rowData['status'] = 0;
-                $statusKet[] = 'NIS tidak boleh kosong';
+                $statusKet[] = 'NIS atau NODAF tidak boleh kosong';
             } else {
-                $siswa = scctcust::where('NOCUST', $rowData['nis'])->first();
-                if (!$siswa) {
-                    $rowData['status'] = 0;
-                    $statusKet[] = "NIS {$rowData['nis']} tidak ditemukan";
-                } elseif ((int) ($siswa->STCUST ?? 0) === 0) {
+                if ($rowData['nis'] !== '') {
+                    $siswa = scctcust::where('NOCUST', $rowData['nis'])->first();
+                    if (!$siswa) {
+                        $rowData['status'] = 0;
+                        $statusKet[] = "NIS {$rowData['nis']} tidak ditemukan";
+                    }
+                } else {
+                    $siswa = scctcust::where('NUM2ND', $rowData['nodaftar'])->first();
+                    if (!$siswa) {
+                        $rowData['status'] = 0;
+                        $statusKet[] = "NODAF {$rowData['nodaftar']} tidak ditemukan";
+                    }
+                }
+
+                if ($siswa && (int) ($siswa->STCUST ?? 0) === 0) {
                     $rowData['status'] = 0;
                     $statusKet[] = 'Siswa nonaktif (STCUST=0)';
                 }
             }
 
-            $rowData['nama'] = $siswa->NMCUST ?? $rowData['nama'];
+            if ($siswa) {
+                $rowData['custid'] = $siswa->CUSTID;
+                $rowData['nama'] = $siswa->NMCUST ?? $rowData['nama'];
+                $rowData['nis'] = ($siswa->NOCUST && $siswa->NOCUST !== '-')
+                    ? (string) $siswa->NOCUST
+                    : $rowData['nis'];
+                $rowData['nodaftar'] = ($siswa->NUM2ND && $siswa->NUM2ND !== '-')
+                    ? (string) $siswa->NUM2ND
+                    : $rowData['nodaftar'];
+            } else {
+                $rowData['custid'] = null;
+                $rowData['nama'] = $rowData['nama'];
+            }
 
             if ($rowData['nama_tagihan'] === '') {
                 $rowData['status'] = 0;
@@ -155,6 +178,7 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
         };
 
         $nisRaw = $pick(['nis']);
+        $nodaftarRaw = $pick(['nodaftar', 'nodaf', 'no_daftar', 'no_pend', 'nopend', 'no_pendaftaran']);
         $nominalRaw = $pick(['nominal', 'jumlah']);
         $namaTagihan = trim((string) ($pick(['nama_tagihan', 'namatagihan', 'tagihan']) ?? ''));
         $periode = trim((string) ($pick(['periode']) ?? ''));
@@ -164,6 +188,9 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
         $nis = $nisRaw === null || trim((string) $nisRaw) === ''
             ? ''
             : (is_numeric($nisRaw) ? (string) (int) $nisRaw : trim((string) $nisRaw));
+        $nodaftar = $nodaftarRaw === null || trim((string) $nodaftarRaw) === ''
+            ? ''
+            : (is_numeric($nodaftarRaw) ? (string) (int) $nodaftarRaw : trim((string) $nodaftarRaw));
 
         $nominal = null;
         if ($nominalRaw !== null && trim((string) $nominalRaw) !== '') {
@@ -172,6 +199,8 @@ class ImportTagihanLunasExcel implements WithMultipleSheets, ToCollection, WithH
 
         return [
             'nis' => $nis,
+            'nodaftar' => $nodaftar,
+            'custid' => null,
             'nama' => null,
             'nama_tagihan' => $namaTagihan,
             'billnm' => $namaTagihan,

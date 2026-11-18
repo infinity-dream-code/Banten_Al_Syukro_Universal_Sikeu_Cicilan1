@@ -106,7 +106,7 @@
             <form id="filterForm"></form>
             <div class="alert alert-warning mb-0">
                 Import Excel membuat tagihan baru dan langsung berstatus <strong>LUNAS</strong>
-                (NIS, nama tagihan, periode, nominal, tanggal bayar, dan bank diambil per baris dari file).
+                (NIS atau NODAF, nama tagihan, periode, nominal, tanggal bayar, dan bank diambil per baris dari file).
             </div>
         </div>
 
@@ -151,13 +151,14 @@
                         <ul class="list-group list-group-timeline mb-3">
                             <li class="list-group-item list-group-timeline-danger">File harus berformat <span class="fw-bold">XLS/XLSX</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
-                            <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">NIS, NAMA TAGIHAN, PERIODE, NOMINAL, TANGGAL BAYAR, BANK</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">NIS atau NODAF, NAMA TAGIHAN, PERIODE, NOMINAL, TANGGAL BAYAR, BANK</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">Identitas siswa: isi <span class="fw-bold">NIS</span> atau <span class="fw-bold">NODAF</span> (No Pendaftaran). Jika keduanya ada, yang dipakai NIS.</li>
                             <li class="list-group-item list-group-timeline-danger">PERIODE contoh: <span class="fw-bold">Juli 2026</span>. TANGGAL BAYAR format <span class="fw-bold">d/m/Y</span> (contoh 4/8/2026).</li>
                             <li class="list-group-item list-group-timeline-danger">BANK: isi <span class="fw-bold">BCAS</span>. Import lunas dicatat sebagai Manual BCAS (TRANSNO format BCAS26/...). Kolom kosong juga dianggap BCAS.</li>
                             <li class="list-group-item list-group-timeline-danger">Nama tagihan harus ada di Master Tagihan (contoh: SPP).</li>
                             <li class="list-group-item list-group-timeline-danger">Contoh file:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
-                                   href="{{asset('TEMPLATE Input Tagihan Lunas.xlsx')}}?v=20261027-lunas"
+                                   href="{{asset('TEMPLATE Input Tagihan Lunas.xlsx')}}?v=20261118-nodaf"
                                    download>
                                     <i class="ri ri-file-excel-line me-2"></i>Template Input Tagihan Lunas
                                 </a>
