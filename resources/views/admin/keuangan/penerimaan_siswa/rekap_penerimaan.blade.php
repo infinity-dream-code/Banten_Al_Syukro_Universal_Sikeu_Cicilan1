@@ -243,6 +243,10 @@
                                 <span class="ri-profile-line me-2"></span>
                                 Cetak Kartu Siswa
                             </button>
+                            <button type="button" class="btn btn-success" id="cetak-kuitansi">
+                                <span class="ri-printer-line me-2"></span>
+                                Cetak Kuitansi
+                            </button>
                             <button type="button" class="btn btn-success" id="export-excel">
                                 <span class="ri-file-excel-2-line me-2"></span>
                                 Export Excel
@@ -262,10 +266,10 @@
             <div class="row px-5 mb-2">
                 <ul class="list-group list-group-timeline">
                     <li class="list-group-item list-group-timeline-warning">
-                        Untuk mencetak kartu siswa, silahkan pilih siswa terlebih dahulu!
+                        Untuk mencetak kartu siswa / kuitansi, silahkan pilih data terlebih dahulu!
                     </li>
                     <li class="list-group-item list-group-timeline-warning">
-                        Cetak kartu siswa, hanya bisa dilakukan per siswa!
+                        Cetak kartu siswa hanya per siswa. Cetak kuitansi memakai <strong>nominal transaksi</strong> (bukan total tagihan).
                     </li>
                 </ul>
             </div>
@@ -292,10 +296,20 @@
     <script src="{{asset('main/libs/bootstrap-daterangepicker/bootstrap-daterangepicker.js')}}"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.12/pdfmake.min.js"
+            integrity="sha512-axXaF5grZBaYl7qiM6OMHgsgVXdSLxqq0w7F4CQxuFyrcPmn0JfnqsOtYHUun80g6mRRdvJDrTCyL8LQqBOt/Q=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.12/vfs_fonts.min.js"
+            integrity="sha512-EFlschXPq/G5zunGPRSYqazR1CMKj0cQc8v6eMrQwybxgIbhsfoO5NAMQX3xFDQIbFlViv53o7Hy+yCWw6iZxA=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    @include('partials.pdf_kop_assets')
+    @include('partials.kuitansi_alsyukro')
 
     <script type="text/javascript" defer>
         const select2 = $(`[data-control='select2']`);
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const tandaTangan = @json($tanda_tangan ?? null);
+        const userName = @json(optional(auth()->user())->name ?? 'Admin Keuangan');
 
         let dtOptions = {
             tableId: 'main_table',
@@ -535,6 +549,181 @@
                 } else {
                     periodeMulai.removeAttr('max');
                 }
+            });
+
+            function formatMetodePembayaran(data, noreff) {
+                if (String(noreff || '').trim().toLowerCase() === 'mobile') {
+                    return 'ANDROID';
+                }
+                const reserved = ['mobile', 'mnl', 'teller', 'reversal', 'jurnal saldo', ''];
+                const noreffTrim = String(noreff || '').trim();
+                if (String(data) === '1140003' && noreffTrim && !reserved.includes(noreffTrim.toLowerCase())) {
+                    return noreffTrim;
+                }
+                const descriptions = {
+                    '1140000': 'Manual Cash',
+                    '1140001': 'Manual BCAS',
+                    '1140002': 'Manual SALDO',
+                    '1140003': 'Transfer Bank Lain',
+                    '1140004': 'INFAQ',
+                    '1140005': 'Transfer Bank BRI',
+                    '1200001': 'Loket Manual - Beasiswa',
+                    '1200002': 'Loket Manual - Potongan',
+                    '1': 'H2H VA BMI - ATM',
+                    '2': 'H2H VA BMI - Teller',
+                    '3': 'H2H VA BMI - IBANK',
+                    '4': 'H2H VA BMI - EDC',
+                    '5': 'H2H VA BMI - MOBILE',
+                    '6': 'ANDROID',
+                };
+                return descriptions[String(data)] || data || '-';
+            }
+
+            function getContentWidth(pageSize = 'A4', orientation = 'portrait', margins = [20, 20, 20, 20]) {
+                const sizes = { A4: [595.28, 841.89] };
+                const size = sizes[pageSize] || sizes.A4;
+                const width = orientation === 'landscape' ? size[1] : size[0];
+                return width - (margins[0] || 0) - (margins[2] || 0);
+            }
+
+            async function generatePdf(title, bodyContent, unit_logo = false, options = {}) {
+                try {
+                    const assets = window.PDF_KOP_ASSETS || {};
+                    const logo = assets.schoolLogo || '';
+                    const orientation = 'portrait';
+                    const pageMargins = [20, 20, 20, 20];
+                    const availableWidth = getContentWidth('A4', orientation, pageMargins);
+                    const headerTable = (typeof buildPdfKopHeader === 'function')
+                        ? buildPdfKopHeader(logo)
+                        : { text: (assets.namaInstansi || '').toUpperCase(), style: 'headerBig', alignment: 'center' };
+
+                    const content = [
+                        headerTable,
+                        {
+                            margin: [0, 5, 0, 5],
+                            canvas: [
+                                { type: 'line', x1: 0, y1: 0, x2: availableWidth, y2: 0, lineWidth: 2 },
+                                { type: 'line', x1: 0, y1: 3, x2: availableWidth, y2: 3, lineWidth: 0.5, lineColor: '#888' },
+                            ],
+                        },
+                    ];
+                    if (title) {
+                        content.push({
+                            text: String(title || '').toUpperCase(),
+                            style: 'title',
+                            decoration: options.titleUnderline ? 'underline' : undefined,
+                            margin: [0, 5, 0, 5],
+                        });
+                    }
+                    content.push(...(bodyContent || []));
+
+                    const docDefinition = {
+                        info: { title: String(title || 'BUKTI PEMBAYARAN').toUpperCase() },
+                        pageSize: 'A4',
+                        pageOrientation: orientation,
+                        pageMargins: pageMargins,
+                        content: content,
+                        styles: {
+                            headerBig: { fontSize: 16, bold: true, alignment: 'center' },
+                            headerSmall: { fontSize: 12, alignment: 'center' },
+                            title: { fontSize: 14, bold: true, alignment: 'center' },
+                        },
+                        defaultStyle: { font: 'Times', fontSize: 10 },
+                    };
+
+                    pdfMake.createPdf(docDefinition).open();
+                    successAlert('File telah didownload <br><p><span class="badge badge-dot bg-danger me-1"></span> Cek pada menu unduhan browser anda untuk memeriksa!</p>');
+                } catch (e) {
+                    console.error('Error generating PDF:', e);
+                    errorAlert(e.message || 'Gagal membuat PDF');
+                }
+            }
+
+            async function generateKuitansiFromRows(rows) {
+                const data = (rows || []).filter((item) => Number(item?.BILLAM ?? item?.DEBET ?? 0) > 0);
+                if (!data[0]) {
+                    warningAlert('Pilih data pembayaran dengan nominal lebih dari 0.');
+                    return;
+                }
+
+                const firstNis = data[0]?.NOCUST ?? data[0]?.nocust;
+                const firstCust = data[0]?.CUSTID ?? data[0]?.custid;
+                const allSame = data.every((row) =>
+                    (row.NOCUST ?? row.nocust) === firstNis && (row.CUSTID ?? row.custid) === firstCust
+                );
+                if (!allSame) {
+                    warningAlert('Silahkan pilih pembayaran siswa yang sama!');
+                    return;
+                }
+
+                loadingAlert('Membuat kuitansi...');
+
+                const siswa = data[0];
+                const tagihans = data.map((item) => ({
+                    AA: item.AA ?? item.item_id,
+                    BILLCD: item.BILLCD,
+                    BILLNM: item.BILLNM,
+                    BILLAC: item.BILLAC_CODE || item.BILLAC,
+                    BTA: item.BTA,
+                    NOMINAL_BAYAR: Number(item.BILLAM ?? item.DEBET ?? 0),
+                    BILLAM: Number(item.BILLAM_TOTAL ?? item.BILLAM ?? 0),
+                    BILLPAID: Number(item.BILLAM ?? item.DEBET ?? 0),
+                    PAIDDT: item.PAIDDT ?? item.TRXDATE,
+                    FIDBANK: item.FIDBANK,
+                    NOREFF: item.NOREFF,
+                    TRANSNO: item.TRANSNO,
+                }));
+
+                const content = (typeof buildKuitansiAlSyukroBody === 'function')
+                    ? buildKuitansiAlSyukroBody({
+                        siswa: {
+                            ...siswa,
+                            NMCUST: siswa.NMCUST || siswa.nmcust,
+                            DESC02: siswa.DESC02,
+                            DESC03: siswa.DESC03,
+                            CODE02: siswa.CODE02,
+                        },
+                        tagihans: tagihans,
+                        bank: siswa.FIDBANK,
+                        biayaLayanan: 0,
+                        tandaTangan: typeof tandaTangan !== 'undefined' ? tandaTangan : null,
+                        userName: typeof userName !== 'undefined' ? userName : 'Admin Keuangan',
+                        formatMetode: formatMetodePembayaran,
+                        nomor: tagihans[0]?.TRANSNO || tagihans[0]?.NOREFF || null,
+                    })
+                    : [];
+
+                Swal.close();
+                await generatePdf(
+                    (typeof KUITANSI_ALSYUKRO_TITLE !== 'undefined' ? KUITANSI_ALSYUKRO_TITLE : 'BUKTI PEMBAYARAN'),
+                    content,
+                    siswa.CODE02,
+                    { titleUnderline: true, skipFooter: true }
+                );
+            }
+
+            document.querySelector('#main_table tbody')?.addEventListener('click', function (e) {
+                if (!e.target.closest('.btn-kuitansi')) {
+                    return;
+                }
+                const rowEl = e.target.closest('tr');
+                if (!rowEl) return;
+                const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
+                if (!rowData) {
+                    warningAlert('Data baris tidak ditemukan.');
+                    return;
+                }
+                generateKuitansiFromRows([rowData]);
+            });
+
+            document.getElementById('cetak-kuitansi')?.addEventListener('click', async function (e) {
+                e.preventDefault();
+                const selected = DT[`${dtOptions.tableId}`].rows({ selected: true }).data().toArray();
+                if (!selected[0]) {
+                    warningAlert('Silahkan pilih data pembayaran terlebih dahulu!');
+                    return;
+                }
+                await generateKuitansiFromRows(selected);
             });
 
             document.getElementById('cetak-kartu-siswa').addEventListener('click', function (e) {

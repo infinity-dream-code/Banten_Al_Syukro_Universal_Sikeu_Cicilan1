@@ -14,6 +14,7 @@ use App\Models\u_akun;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\sccttran;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
@@ -169,12 +170,14 @@ class RekapPenerimaanController extends Controller
         $item->PAIDDT = $item->TRXDATE;
         $item->BILLAM = $this->resolveNominalAmount($item);
         $item->BILLNM = $item->BILLNM ?? $item->BILLTARGET ?? (strtoupper(trim((string) ($item->METODE ?? ''))) === 'TOP UP' ? 'TOP UP' : '-');
-        $item->PERIODE = PeriodeHelper::label($this->resolvePeriode($item));
+        $item->BILLAC_CODE = $this->resolvePeriode($item);
+        $item->PERIODE = PeriodeHelper::label($item->BILLAC_CODE);
         $item->METODE_BAYAR = $this->resolveMetodeLabel($item, $metodeBayarMap);
         $item->REMARK = trim((string) ($item->METODE ?? '')) ?: '-';
         $item->NOREFF = trim((string) ($item->NOREFF ?? '')) ?: '-';
         $item->kelas_label = trim(($item->DESC02 ?? '') . ' ' . ($item->DESC03 ?? ''));
         $item->NOVA = ($item->NOCUST && $item->NOCUST != '-') ? scctcust::showVA($item->NOCUST) : '-';
+        $item->kuitansi = (int) ($item->BILLAM ?? 0) > 0;
 
         if (!$item->NOCUST || $item->NOCUST == '-') {
             $item->NOCUST = null;
@@ -223,6 +226,22 @@ class RekapPenerimaanController extends Controller
             ['data' => 'REMARK', 'name' => 'Remark', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'NOREFF', 'name' => 'No Ref', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'NOCUST', 'name' => 'NIS', 'searchable' => true, 'orderable' => true, 'exportable' => true],
+            [
+                'data' => 'kuitansi',
+                'name' => 'Kuitansi',
+                'orderable' => false,
+                'dataVal' => false,
+                'columnType' => 'button',
+                'className' => 'text-center exclude-selection',
+                'excludeFromSelection' => true,
+                'button' => 'action',
+                'buttonText' => 'Kuitansi',
+                'buttonClass' => 'btn btn-sm btn-success btn-kuitansi',
+                'buttonLink' => '#',
+                'buttonIcon' => 'ri-printer-line me-2',
+                'exportable' => false,
+                'duplicate' => false,
+            ],
         ];
     }
 
@@ -252,6 +271,7 @@ class RekapPenerimaanController extends Controller
             MetodeBayarHelper::TOPUP_FILTER_VALUE => 'Top Up',
             '6' => 'ANDROID',
         ]);
+        $data['tanda_tangan'] = User::getTandaTanganBase64();
 
         return view('admin.keuangan.penerimaan_siswa.rekap_penerimaan', $data);
     }
@@ -513,10 +533,11 @@ class RekapPenerimaanController extends Controller
                 'sccttran.KREDIT',
                 'sccttran.INSTALLMENT',
                 'sccttran.BILLTARGET',
+                'sccttran.TRANSNO',
                 'scctbill.AA',
                 'scctbill.BILLNM',
                 'scctbill.BILLAC',
-                'scctbill.BILLAM',
+                'scctbill.BILLAM as BILLAM_TOTAL',
                 'scctbill.BILLPAID',
                 'scctbill.PAIDST',
                 'scctbill.BILLCD',
