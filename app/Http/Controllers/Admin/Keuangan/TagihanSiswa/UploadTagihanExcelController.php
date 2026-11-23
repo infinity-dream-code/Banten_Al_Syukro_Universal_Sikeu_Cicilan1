@@ -62,8 +62,8 @@ class UploadTagihanExcelController extends Controller
         return [
             ['data' => null, 'name' => 'no', 'className' => 'text-center', 'columnType' => 'row'],
             ['data' => 'nis', 'name' => 'NIS', 'searchable' => true, 'orderable' => true],
-            ['data' => 'nodaftar', 'name' => 'No Pend', 'searchable' => true, 'orderable' => true],
-            ['data' => 'name', 'name' => 'NAMA', 'searchable' => true, 'orderable' => true],
+            ['data' => 'nodaftar', 'name' => 'NODAF', 'searchable' => true, 'orderable' => true],
+            ['data' => 'name', 'name' => 'Nama Siswa', 'searchable' => true, 'orderable' => true],
             ['data' => 'status', 'name' => 'Status', 'searchable' => true, 'orderable' => true, 'columnType' => 'importstatus'],
             ['data' => 'keterangan', 'name' => 'Keterangan', 'searchable' => true, 'orderable' => true],
             ['data' => 'unit', 'name' => 'Unit', 'searchable' => true, 'orderable' => true],
@@ -119,19 +119,12 @@ class UploadTagihanExcelController extends Controller
             }
         }
 
-        $searchValue = $search_arr['value'] ?? '';
-
-        $filters = [];
-        $filterQuery = null;
-
         $cachedData = Cache::get($this->cacheKey, []);
         if (!is_array($cachedData)) {
             $cachedData = [];
         }
 
-        $nisList = collect($cachedData)->pluck('nis')->toArray();
         $nisCount = count($cachedData);
-
 
         $whereAny = [
             'scctcust.NMCUST',
@@ -139,24 +132,35 @@ class UploadTagihanExcelController extends Controller
         ];
 
         $select = array_unique(array_merge($whereAny, [
+            'scctcust.CUSTID',
             'scctcust.NUM2ND',
             'scctcust.CODE02',
             'scctcust.DESC02',
             'scctcust.DESC03',
             'scctcust.DESC04',
+            'scctcust.STCUST',
         ]));
 
-        $records = collect($cachedData)->map(function ($item) use ($select){
+        $records = collect($cachedData)->map(function ($item) use ($select) {
+            $custId = trim((string) ($item['custid'] ?? ''));
             $nis = trim((string) ($item['nis'] ?? ''));
+            $nodaftar = trim((string) ($item['nodaftar'] ?? ''));
+
             $siswa = null;
-            if ($nis !== '') {
-                $siswaQuery = scctcust::select($select)->where('scctcust.NOCUST', $nis);
-                SchoolScope::apply($siswaQuery, 'scctcust', $this->sekolah);
-                $siswa = $siswaQuery->first();
+            $siswaQuery = scctcust::select($select);
+            SchoolScope::apply($siswaQuery, 'scctcust', $this->sekolah);
+
+            if ($custId !== '') {
+                $siswa = (clone $siswaQuery)->where('scctcust.CUSTID', $custId)->first();
+            } elseif ($nis !== '') {
+                $siswa = (clone $siswaQuery)->where('scctcust.NOCUST', $nis)->first();
+            } elseif ($nodaftar !== '') {
+                $siswa = (clone $siswaQuery)->where('scctcust.NUM2ND', $nodaftar)->first();
             }
+
             return [
-                'nis' => $nis !== '' ? $nis : null,
-                'nodaftar' => $item['nodaftar'] ?? ($siswa->NUM2ND ?? null),
+                'nis' => $nis !== '' ? $nis : (($siswa && $siswa->NOCUST && $siswa->NOCUST !== '-') ? (string) $siswa->NOCUST : null),
+                'nodaftar' => $nodaftar !== '' ? $nodaftar : (($siswa && $siswa->NUM2ND && $siswa->NUM2ND !== '-') ? (string) $siswa->NUM2ND : null),
                 'name' => $item['nama'] ?? ($siswa->NMCUST ?? null),
                 'ortu' => $item['ortu'] ?? $item['ayah'] ?? $item['genus'] ?? null,
                 'alamat' => $item['alamat'] ?? null,
@@ -171,15 +175,15 @@ class UploadTagihanExcelController extends Controller
             ];
         });
 
-        $response = array(
+        $response = [
             'draw' => intval($draw),
             'recordsTotal' => $nisCount,
             'recordsFiltered' => $nisCount,
             'data' => $records,
-        );
+        ];
+
         return response()->json($response);
     }
-
 
     public function store(Request $request)
     {
@@ -201,40 +205,74 @@ class UploadTagihanExcelController extends Controller
 
         try {
             $headingsData = (new HeadingRowImport)->toArray($file);
-            $requiredColumns = ['nama', 'unit', 'kelas', 'kelompok', 'angkatan', 'nominal'];
-            $conditionalColumns = ['nis', 'nodaftar'];
             if (empty($headingsData) || !isset($headingsData[0][0])) {
                 throw new \Exception('Tidak dapat membaca judul kolom dari file. Pastikan file memiliki header yang sesuai.');
             }
-            $headings = array_map(
-                static fn ($heading) => strtolower(trim((string) $heading)),
-                $headingsData[0][0]
-            );
-            $missingColumns = [];
-            $hasNis = in_array('nis', $headings, true);
-            $hasNodaftar = in_array('nodaftar', $headings, true);
-            if (!$hasNis && !$hasNodaftar) {
-                $missingColumns[] = 'NIS / NODAFTAR';
+
+            $headings = array_map(static function ($heading) {
+                $normalized = strtolower(trim((string) $heading));
+                $normalized = str_replace(['*', '-'], ['', '_'], $normalized);
+
+                return preg_replace('/\s+/', '_', $normalized);
+            }, $headingsData[0][0]);
+
+            $aliases = [
+                'nis' => ['nis'],
+                'nodaftar' => ['nodaftar', 'nodaf', 'no_daftar', 'no_pend', 'nopend', 'no_pendaftaran'],
+                'nominal' => ['nominal', 'jumlah', 'tagihan'],
+            ];
+
+            $hasNis = false;
+            $hasNodaftar = false;
+            foreach ($aliases['nis'] as $alias) {
+                if (in_array($alias, $headings, true)) {
+                    $hasNis = true;
+                    break;
+                }
             }
-            foreach ($requiredColumns as $column) {
-                if (!in_array($column, $headings, true)) {
-                    $missingColumns[] = $column;
+            foreach ($aliases['nodaftar'] as $alias) {
+                if (in_array($alias, $headings, true)) {
+                    $hasNodaftar = true;
+                    break;
                 }
             }
 
+            $hasNominal = false;
+            foreach ($aliases['nominal'] as $alias) {
+                if (in_array($alias, $headings, true)) {
+                    $hasNominal = true;
+                    break;
+                }
+            }
+
+            $missingColumns = [];
+            if (!$hasNis && !$hasNodaftar) {
+                $missingColumns[] = 'NIS / NODAF';
+            }
+            if (!$hasNominal) {
+                $missingColumns[] = 'NOMINAL';
+            }
+
             if (!empty($missingColumns)) {
-                $formattedMissingColumns = strtoupper(str_replace('_', ' ', implode(', ', $missingColumns)));
-                $formattedRequiredColumns = strtoupper(str_replace('_', ' ', implode(', ', array_merge($requiredColumns, $conditionalColumns))));
-                throw new \Exception("Kolom $formattedMissingColumns tidak ditemukan.<br><hr> pastikan kolom berikut ada dan terisi pada file import yang akan diproses: $formattedRequiredColumns.<br>Format sama dengan Import Data Siswa, ditambah kolom NOMINAL.");
+                throw new \Exception(
+                    'Kolom ' . implode(', ', $missingColumns) . ' tidak ditemukan.<br><hr>' .
+                    'Pastikan kolom berikut ada: <strong>NIS atau NODAF, NOMINAL</strong>.'
+                );
             }
 
             DB::beginTransaction();
-            Excel::import(new ImportTagihanExcel($this->cacheKey), $file);
+            Excel::import(new ImportTagihanExcel($this->cacheKey, $this->sekolah), $file);
             DB::commit();
 
             $data = Cache::get($this->cacheKey, []);
             if (empty($data)) {
-                throw new \Exception('File berhasil dibaca, tetapi tidak ada baris data yang dapat diproses. Pastikan file berisi NIS dan Nominal.');
+                throw new \Exception('File berhasil dibaca, tetapi tidak ada baris data yang dapat diproses. Pastikan file berisi NIS atau NODAF dan Nominal.');
+            }
+
+            $invalidCount = collect($data)->where('status', 0)->count();
+            $message = 'Sukses, data tagihan telah diimport, silahkan periksa kembali';
+            if ($invalidCount > 0) {
+                $message .= " ({$invalidCount} baris perlu diperbaiki, lihat kolom Keterangan)";
             }
 
             Log::info('Upload tagihan excel berhasil', [
@@ -243,7 +281,7 @@ class UploadTagihanExcelController extends Controller
                 'row_count' => count($data),
             ]);
 
-            return response()->json(['message' => 'Sukses, data tagihan telah diimport, silahkan periksa kembali', 'data' => $data], 200);
+            return response()->json(['message' => $message, 'data' => $data], 200);
         } catch (ValidationException $e) {
             DB::rollBack();
             $errorMessages = $e->errors();
@@ -284,27 +322,57 @@ class UploadTagihanExcelController extends Controller
         ], ValidationMessage::messages(), ValidationMessage::attributes());
 
         $data = Cache::get($this->cacheKey);
-        if (empty($data))return response()->json(['message' => 'Silahkan import data tagihan terlebih dahulu'], 422);
+        if (empty($data)) {
+            return response()->json(['message' => 'Silahkan import data tagihan terlebih dahulu'], 422);
+        }
+
+        $validRows = collect($data)->where('status', 1)->values();
+        if ($validRows->isEmpty()) {
+            return response()->json(['message' => 'Tidak ada baris valid yang dapat disimpan. Perbaiki kolom Keterangan.'], 422);
+        }
 
         $bta = $request->filled('periode_bulan')
             ? sprintf('%04d%02d', (int) $request->periode_tahun, (int) $request->periode_bulan)
             : sprintf('%04d', (int) $request->periode_tahun);
 
         $tagihan = mst_tagihan::where('urut', $request->tagihan)->first();
-        if (!$tagihan) return response()->json(['message' => 'Tagihan tidak ditemukan, silahkan muat ulang halaman!'], 422);
+        if (!$tagihan) {
+            return response()->json(['message' => 'Tagihan tidak ditemukan, silahkan muat ulang halaman!'], 422);
+        }
 
         try {
             DB::beginTransaction();
             $skippedInactive = [];
             $insertedCount = 0;
-            foreach ($data as $item) {
-                if ($item['status'] != 1) continue;
-                $siswa = scctcust::where('NOCUST', $item['nis']);
-                SchoolScope::apply($siswa, 'scctcust', $this->sekolah);
-                $siswa = $siswa->first();
-                if (!$siswa) return response()->json(['message' => "siswa dengan nis: {$item['nis']} tidak ditemukan!"], 422);
+
+            foreach ($validRows as $item) {
+                $siswaQuery = scctcust::query();
+                SchoolScope::apply($siswaQuery, 'scctcust', $this->sekolah);
+
+                $custId = trim((string) ($item['custid'] ?? ''));
+                $nis = trim((string) ($item['nis'] ?? ''));
+                $nodaftar = trim((string) ($item['nodaftar'] ?? ''));
+
+                if ($custId !== '') {
+                    $siswaQuery->where('CUSTID', $custId);
+                } elseif ($nis !== '') {
+                    $siswaQuery->where('NOCUST', $nis);
+                } elseif ($nodaftar !== '') {
+                    $siswaQuery->where('NUM2ND', $nodaftar);
+                } else {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Baris tanpa NIS/NODAF tidak dapat disimpan.'], 422);
+                }
+
+                $siswa = $siswaQuery->first();
+                if (!$siswa) {
+                    DB::rollBack();
+                    $label = $nis !== '' ? "NIS: {$nis}" : ($nodaftar !== '' ? "NODAF: {$nodaftar}" : "CUSTID: {$custId}");
+                    return response()->json(['message' => "Siswa dengan {$label} tidak ditemukan!"], 422);
+                }
+
                 if ((int) ($siswa->STCUST ?? 0) === 0) {
-                    $skippedInactive[] = trim(($item['nis'] ?? '-') . ' - ' . ($siswa->NMCUST ?? 'Tanpa Nama'));
+                    $skippedInactive[] = trim(($nis ?: $nodaftar) . ' - ' . ($siswa->NMCUST ?? 'Tanpa Nama'));
                     continue;
                 }
 

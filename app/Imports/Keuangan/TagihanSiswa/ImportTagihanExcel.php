@@ -3,6 +3,7 @@
 namespace App\Imports\Keuangan\TagihanSiswa;
 
 use App\Models\scctcust;
+use App\Support\SchoolScope;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -12,8 +13,10 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 class ImportTagihanExcel implements WithMultipleSheets, ToCollection, WithHeadingRow, SkipsEmptyRows
 {
-    public function __construct(private string $cacheKey = 'import_tagihan_excel')
-    {
+    public function __construct(
+        private string $cacheKey = 'import_tagihan_excel',
+        private ?string $sekolah = null
+    ) {
     }
 
     public function sheets(): array
@@ -34,36 +37,66 @@ class ImportTagihanExcel implements WithMultipleSheets, ToCollection, WithHeadin
 
             $rowData = $this->normalizeRow($row->toArray());
             $nis = $rowData['nis'] ?? '';
+            $nodaftar = $rowData['nodaftar'] ?? '';
             $nominal = $rowData['nominal'] ?? null;
-            $nominalBlank = $nominal === null || trim((string) $nominal) === '';
 
-            if ($nis === '' && $nominalBlank) {
+            if ($nis === '' && $nodaftar === '' && $nominal === null) {
                 continue;
             }
 
             $rowData['status'] = 1;
-            $status_ket = null;
+            $statusKet = [];
 
-            if ($nis === '') {
+            $siswa = null;
+            if ($nis === '' && $nodaftar === '') {
                 $rowData['status'] = 0;
-                $status_ket = 'NIS tidak boleh kosong';
+                $statusKet[] = 'NIS atau NODAF tidak boleh kosong';
             } else {
-                $checkData = scctcust::where('NOCUST', $nis)->first();
-                if (!$checkData) {
+                if ($nis !== '') {
+                    $siswaQuery = scctcust::where('NOCUST', $nis);
+                    SchoolScope::apply($siswaQuery, 'scctcust', $this->sekolah);
+                    $siswa = $siswaQuery->first();
+                    if (!$siswa) {
+                        $rowData['status'] = 0;
+                        $statusKet[] = "NIS {$nis} tidak ditemukan";
+                    }
+                } else {
+                    $siswaQuery = scctcust::where('NUM2ND', $nodaftar);
+                    SchoolScope::apply($siswaQuery, 'scctcust', $this->sekolah);
+                    $siswa = $siswaQuery->first();
+                    if (!$siswa) {
+                        $rowData['status'] = 0;
+                        $statusKet[] = "NODAF {$nodaftar} tidak ditemukan";
+                    }
+                }
+
+                if ($siswa && (int) ($siswa->STCUST ?? 0) === 0) {
                     $rowData['status'] = 0;
-                    $status_ket = "NIS {$nis} tidak ditemukan";
+                    $statusKet[] = 'Siswa nonaktif (STCUST=0)';
                 }
             }
 
-            if ($nominalBlank) {
+            if ($siswa) {
+                $rowData['custid'] = $siswa->CUSTID;
+                $rowData['nama'] = ($siswa->NMCUST && $siswa->NMCUST !== '-') ? (string) $siswa->NMCUST : $rowData['nama'];
+                $rowData['nis'] = ($siswa->NOCUST && $siswa->NOCUST !== '-') ? (string) $siswa->NOCUST : $rowData['nis'];
+                $rowData['nodaftar'] = ($siswa->NUM2ND && $siswa->NUM2ND !== '-') ? (string) $siswa->NUM2ND : $rowData['nodaftar'];
+                $rowData['unit'] = $rowData['unit'] ?: ($siswa->CODE02 ?? null);
+                $rowData['kelas'] = $rowData['kelas'] ?: ($siswa->DESC02 ?? null);
+                $rowData['kelompok'] = $rowData['kelompok'] ?: ($siswa->DESC03 ?? null);
+                $rowData['angkatan'] = $rowData['angkatan'] ?: ($siswa->DESC04 ?? null);
+            } else {
+                $rowData['custid'] = null;
+            }
+
+            if ($nominal === null || (int) $nominal <= 0) {
                 $rowData['status'] = 0;
-                if (!empty($status_ket)) {
-                    $status_ket .= ', ';
-                }
-                $status_ket .= 'Nominal tidak boleh kosong';
+                $statusKet[] = 'Nominal harus lebih dari 0';
+            } else {
+                $rowData['nominal'] = (int) $nominal;
             }
 
-            $rowData['keterangan'] = $status_ket;
+            $rowData['keterangan'] = $statusKet ? implode(', ', $statusKet) : null;
             $processedData[] = $rowData;
         }
 
@@ -77,7 +110,10 @@ class ImportTagihanExcel implements WithMultipleSheets, ToCollection, WithHeadin
     {
         $lookup = [];
         foreach ($rowData as $key => $value) {
-            $lookup[strtolower(trim((string) $key))] = $value;
+            $normalized = strtolower(trim((string) $key));
+            $normalized = str_replace(['*', '-'], ['', '_'], $normalized);
+            $normalized = preg_replace('/\s+/', '_', $normalized);
+            $lookup[$normalized] = $value;
         }
 
         $pick = function (array $aliases) use ($lookup) {
@@ -90,21 +126,30 @@ class ImportTagihanExcel implements WithMultipleSheets, ToCollection, WithHeadin
         };
 
         $nisRaw = $pick(['nis']);
-        $nodaftarRaw = $pick(['nodaftar', 'no_daftar', 'no_pend', 'nopend']);
-        $kelasRaw = $pick(['kelas']);
+        $nodaftarRaw = $pick(['nodaftar', 'nodaf', 'no_daftar', 'no_pend', 'nopend', 'no_pendaftaran']);
         $nominalRaw = $pick(['nominal', 'jumlah', 'tagihan']);
+        $kelasRaw = $pick(['kelas']);
 
         $nis = $nisRaw === null || trim((string) $nisRaw) === ''
             ? ''
             : (is_numeric($nisRaw) ? (string) (int) $nisRaw : trim((string) $nisRaw));
         $nodaftar = $nodaftarRaw === null || trim((string) $nodaftarRaw) === ''
-            ? null
+            ? ''
             : (is_numeric($nodaftarRaw) ? (string) (int) $nodaftarRaw : trim((string) $nodaftarRaw));
+
+        $nominal = null;
+        if ($nominalRaw !== null && trim((string) $nominalRaw) !== '') {
+            $cleaned = preg_replace('/[^\d]/', '', (string) $nominalRaw);
+            if ($cleaned !== '') {
+                $nominal = (int) $cleaned;
+            }
+        }
 
         return [
             'nis' => $nis,
             'nodaftar' => $nodaftar,
-            'nama' => trim((string) ($pick(['nama', 'nmcust']) ?? '')),
+            'custid' => null,
+            'nama' => trim((string) ($pick(['nama', 'nmcust', 'nama_siswa']) ?? '')),
             'unit' => trim((string) ($pick(['unit']) ?? '')),
             'kelas' => is_numeric($kelasRaw) ? (string) (int) $kelasRaw : trim((string) ($kelasRaw ?? '')),
             'kelompok' => trim((string) ($pick(['kelompok']) ?? '')),
@@ -112,7 +157,7 @@ class ImportTagihanExcel implements WithMultipleSheets, ToCollection, WithHeadin
             'gender' => trim((string) ($pick(['gender', 'jk', 'jenis_kelamin']) ?? '')) ?: null,
             'alamat' => trim((string) ($pick(['alamat']) ?? '')) ?: null,
             'ortu' => trim((string) ($pick(['ortu', 'genus', 'ayah', 'wali']) ?? '')) ?: null,
-            'nominal' => $nominalRaw,
+            'nominal' => $nominal,
         ];
     }
 

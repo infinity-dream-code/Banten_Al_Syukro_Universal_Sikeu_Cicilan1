@@ -111,6 +111,9 @@
         </div>
 
         <div class="card-body border-bottom upload-tagihan-toolbar py-4">
+            <div class="alert alert-info mb-3">
+                Import Excel membuat tagihan baru untuk siswa berdasarkan <strong>NIS atau NODAF</strong> dan <strong>NOMINAL</strong> sesuai Jenis Tagihan dan Periode yang dipilih di bawah.
+            </div>
             <form id="filterForm">
                 <div class="row g-4">
                     <div class="col-md-6 col-xl-5">
@@ -205,14 +208,14 @@
                         <ul class="list-group list-group-timeline mb-3">
                             <li class="list-group-item list-group-timeline-danger">File harus berformat <span class="fw-bold">XLS/XLSX</span>.</li>
                             <li class="list-group-item list-group-timeline-danger">Ukuran file tidak boleh lebih dari <span class="fw-bold">1024KB/1MB</span>.</li>
-                            <li class="list-group-item list-group-timeline-danger">Format sama dengan <span class="fw-bold">Import Data Siswa</span>, ditambah kolom <span class="fw-bold">NOMINAL</span>.</li>
-                            <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">NIS, Nama, Unit, Kelas, Kelompok, Angkatan, Nominal</span>.</li>
-                            <li class="list-group-item list-group-timeline-danger">Kolom opsional: <span class="fw-bold">Gender, Alamat, Ortu</span>. Satu file bisa dipakai di menu Data Siswa dan Buat Tagihan Excel.</li>
-                            <li class="list-group-item list-group-timeline-danger">Contoh file yang dapat diproses untuk import:
+                            <li class="list-group-item list-group-timeline-danger">Kolom wajib: <span class="fw-bold">NIS atau NODAF, NOMINAL</span>.</li>
+                            <li class="list-group-item list-group-timeline-danger">Identitas siswa: isi <span class="fw-bold">NIS</span> atau <span class="fw-bold">NODAF</span> (No Pendaftaran). Jika keduanya ada, yang dipakai NIS.</li>
+                            <li class="list-group-item list-group-timeline-danger">Kolom opsional: <span class="fw-bold">Nama, Unit, Kelas, Kelompok, Angkatan, Gender, Alamat, Ortu</span> (jika kosong akan otomatis terisi dari data siswa).</li>
+                            <li class="list-group-item list-group-timeline-danger">Contoh file:
                                 <a class="btn btn-sm btn-outline-primary fw-bolder"
-                                   href="{{asset('TEMPLATE MENU UPLOAD DATA SISWA.xlsx')}}?v=20260918-nominal"
+                                   href="{{asset('TEMPLATE Input Tagihan.xlsx')}}?v=20261123-nodaf"
                                    download>
-                                    <i class="ri ri-file-excel-line me-2"></i>Contoh File
+                                    <i class="ri ri-file-excel-line me-2"></i>Template Input Tagihan
                                 </a>
                             </li>
                         </ul>
