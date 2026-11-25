@@ -867,6 +867,7 @@ function dtButtons(options, buttons) {
                                 if (!rawPeriode || rawPeriode === '-') {
                                     return '';
                                 }
+                                let periodeOut = rawPeriode;
                                 // YYYYMM → "September 2026"
                                 if (/^\d{6}$/.test(rawPeriode)) {
                                     const monthsID = [
@@ -875,12 +876,12 @@ function dtButtons(options, buttons) {
                                     ];
                                     const pmYear = rawPeriode.substring(0, 4);
                                     const pmMonth = parseInt(rawPeriode.substring(4, 6), 10);
-                                    return (pmMonth >= 1 && pmMonth <= 12)
+                                    periodeOut = (pmMonth >= 1 && pmMonth <= 12)
                                         ? `${monthsID[pmMonth - 1]} ${pmYear}`
                                         : rawPeriode;
                                 }
-                                // Sudah label ("September 2026") atau tahun saja ("2026") → tetap tampil
-                                return rawPeriode;
+                                // Prefix \0 agar Excel tidak mengubah angka tahun (mis. 2026) jadi tanggal 1905
+                                return config.extend === 'excel' ? ("\0" + periodeOut) : periodeOut;
                             }
                             case 'currency':
                                 if (config.extend !== 'excel') {
