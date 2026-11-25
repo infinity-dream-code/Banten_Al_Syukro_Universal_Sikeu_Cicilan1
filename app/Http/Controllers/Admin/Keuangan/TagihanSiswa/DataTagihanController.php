@@ -1002,23 +1002,6 @@ class DataTagihanController extends Controller
                 $noWa = trim((string) ($get('NO_WA') ?? ''));
                 $hasWa = WhatsappTagihan::formatPhone($noWa) !== null;
 
-                $billNm = trim((string) ($get('BILLNM') ?? ''));
-                $isSpp = strcasecmp($billNm, 'SPP') === 0;
-                // SPP: tampilkan periode bulanan. Selain SPP: pakai tanggal bayar (hindari tahun "2026" terbaca serial Excel).
-                if ($isSpp) {
-                    $periodeDisplay = PeriodeHelper::label($get('BILLAC'));
-                } elseif ($paidDtDisplay) {
-                    try {
-                        $periodeDisplay = Carbon::parse($paidDtDisplay)
-                            ->locale('id')
-                            ->translatedFormat('l, j F Y H:i');
-                    } catch (\Throwable) {
-                        $periodeDisplay = (string) $paidDtDisplay;
-                    }
-                } else {
-                    $periodeDisplay = '';
-                }
-
                 return [
                     'AA' => $get('AA'),
                     'item_id' => $get('AA'),
@@ -1037,7 +1020,8 @@ class DataTagihanController extends Controller
                     'BILLAM' => $get('PAYMENTLEFT'),
                     'BILLPAID' => $get('BILLPAID'),
                     'PAYMENTLEFT' => $get('PAYMENTLEFT'),
-                    'BILLAC' => $periodeDisplay,
+                    // Selalu label periode (bulan/tahun). Jangan pakai tanggal bayar.
+                    'BILLAC' => PeriodeHelper::label($get('BILLAC')),
                     'BILLAC_CODE' => $get('BILLAC'),
                     'BTA' => $get('BTA'),
                     'PAIDST' => $get('PAIDST'),
