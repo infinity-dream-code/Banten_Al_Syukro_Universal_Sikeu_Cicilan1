@@ -862,17 +862,26 @@ function dtButtons(options, buttons) {
                                 };
                                 return tsDate.toLocaleDateString('id-ID', tsOptions);
                             case 'periode':
-                            case 'yearmonth':
-                                if (!data || typeof data !== 'string' || data.length !== 6 || !/^\d{6}$/.test(data)) {
+                            case 'yearmonth': {
+                                const rawPeriode = data == null ? '' : String(data).trim();
+                                if (!rawPeriode || rawPeriode === '-') {
                                     return '';
                                 }
-                                const monthsID = [
-                                    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-                                    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-                                ];
-                                const pmYear = Math.floor(data / 100);
-                                const pmMonth = data % 100;
-                                return (pmMonth >= 1 && pmMonth <= 12) ? `${monthsID[pmMonth - 1]} ${pmYear}` : '';
+                                // YYYYMM → "September 2026"
+                                if (/^\d{6}$/.test(rawPeriode)) {
+                                    const monthsID = [
+                                        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                                        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                                    ];
+                                    const pmYear = rawPeriode.substring(0, 4);
+                                    const pmMonth = parseInt(rawPeriode.substring(4, 6), 10);
+                                    return (pmMonth >= 1 && pmMonth <= 12)
+                                        ? `${monthsID[pmMonth - 1]} ${pmYear}`
+                                        : rawPeriode;
+                                }
+                                // Sudah label ("September 2026") atau tahun saja ("2026") → tetap tampil
+                                return rawPeriode;
+                            }
                             case 'currency':
                                 if (config.extend !== 'excel') {
                                     return new Intl.NumberFormat('id-ID', {
